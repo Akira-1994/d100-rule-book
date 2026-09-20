@@ -1,0 +1,8 @@
+sheet: 施法者創角須知
+kind: tables
+tables:
+  - name: 法術啟蒙所需年歲（以法師為例）
+    note_row: 1
+    header_row: 3
+    rows: [4, 14]
+    cols: [3, 9]

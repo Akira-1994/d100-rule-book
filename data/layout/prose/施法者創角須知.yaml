@@ -1,0 +1,21 @@
+sheet: 施法者創角須知
+kind: prose
+mode: explicit
+# 這張表的標題與內容上下交錯且同在一欄，長度與標點都區分不開
+# （「奧術知識（知識）難度2」比「法師應先決技能及應注意事項」還短），
+# 因此逐段宣告列號。C3~C9 的年歲對照表另見 data/layout/tables。
+blocks:
+  - {col: 1, title_row: 1,  rows: [2, 5],   group: 各職業先決技能}
+  - {col: 2, title_row: 1,  rows: [2, 5],   group: 各職業先決技能}
+  - {col: 1, title_row: 6,  rows: [7, 9],   group: 各職業先決技能}
+  - {col: 2, title_row: 6,  rows: [7, 9],   group: 各職業先決技能}
+  - {col: 1, title_row: 10, rows: [11, 13], group: 各職業先決技能}
+  - {col: 2, title_row: 10, rows: [11, 13], group: 各職業先決技能}
+  - {col: 1, title_row: 14, rows: [15, 15], group: 施法規則}
+  - {col: 1, title_row: 16, rows: [17, 17], group: 施法規則}
+  - {col: 1, title_row: 18, rows: [19, 19], group: 施法規則}
+  - {col: 1, title_row: 20, rows: [21, 21], group: 施法規則}
+  - {col: 1, title_row: 22, rows: [23, 23], group: 施法規則}
+  - {col: 1, title_row: 24, rows: [25, 25], group: 施法規則}
+  - {col: 1, title_row: 26, rows: [27, 28], group: 施法規則}
+  - {col: 1, title_row: 29, rows: [30, 31], group: 施法規則}

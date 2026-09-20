@@ -1,0 +1,10 @@
+sheet: 特殊職業2
+entries:
+  - row: 3
+    col: 4
+    flag: missing_effect
+    covers: [missing_effect]
+    reason: >-
+      咒火使者的「基本前置專長」中，〈頑強（戰鬥）〉只有分類與難度（1），
+      沒有效果敘述。與 Warlock、奈瑟瑞爾奧術師的入職門檻區塊情況相同，
+      待作者確認這一區是在宣告門檻還是漏寫了效果。

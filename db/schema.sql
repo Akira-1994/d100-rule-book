@@ -178,6 +178,21 @@ CREATE TABLE affix_rank (
     PRIMARY KEY (affix_id, rank, condition)
 );
 
+-- 混沌石擲出詞綴時，可能出現哪些詞綴由「部位 × 魔法物品加值」決定。
+-- 這裡是那張對照表的展開：每一列代表「某部位在某個加值等級可以出現某條詞綴」。
+CREATE TABLE affix_distribution (
+    id           INTEGER PRIMARY KEY,
+    slot         TEXT NOT NULL,
+    plus_label   TEXT NOT NULL,
+    affix_name   TEXT NOT NULL,
+    source_sheet TEXT NOT NULL,
+    source_row   INTEGER NOT NULL,
+    source_col   INTEGER NOT NULL,
+    UNIQUE (source_sheet, source_row, source_col)
+);
+
+CREATE INDEX idx_affix_distribution_slot ON affix_distribution(slot, plus_label);
+
 -- 素材與素材詞綴 --------------------------------------------------------
 
 CREATE TABLE material (
@@ -219,15 +234,62 @@ CREATE INDEX idx_material_affix_material ON material_affix(material_id);
 
 -- 規則散文 --------------------------------------------------------------
 
--- 表頭之前的前言區塊：製作耗時、傳奇專長的解鎖門檻、CP 計算公式等。
--- 這些不在表格裡但一樣是規則，不能因為版面不同就丟掉。
+-- 散文型規則：創角流程、戰鬥流程、世界觀、各表前言等。
+--
+-- section / subsection 保留原表的層級（戰鬥流程就是兩層：大步驟底下再分
+-- 一般動作、自由動作、即時動作）。sort_order 保留原表的閱讀順序。
 CREATE TABLE rule_text (
     id           INTEGER PRIMARY KEY,
     sheet        TEXT NOT NULL,
+    section      TEXT,
+    subsection   TEXT,
+    body         TEXT NOT NULL,
+    sort_order   INTEGER NOT NULL DEFAULT 0,
     source_row   INTEGER NOT NULL,
     source_col   INTEGER NOT NULL,
-    body         TEXT NOT NULL,
     UNIQUE (sheet, source_row, source_col)
+);
+
+CREATE INDEX idx_rule_text_sheet ON rule_text(sheet, sort_order);
+
+-- 小型對照表：等級→CP、環數→價格、素材買賣價、地形→額外法術等。
+--
+-- 規則書裡散落著數十張這種查表，欄位各不相同，硬要各建一張資料表並不
+-- 划算。這裡用通用結構收：欄名存在 columns_json，每列的值存在 cells_json，
+-- 兩者都是 JSON 陣列，由應用端照著渲染。
+CREATE TABLE ref_table (
+    id           TEXT PRIMARY KEY,
+    sheet        TEXT NOT NULL,
+    name         TEXT NOT NULL,
+    note         TEXT,
+    columns_json TEXT NOT NULL,
+    sort_order   INTEGER NOT NULL DEFAULT 0,
+    source_row   INTEGER NOT NULL,
+    source_col   INTEGER NOT NULL,
+    UNIQUE (sheet, source_row, source_col)
+);
+
+CREATE TABLE ref_row (
+    table_id   TEXT NOT NULL REFERENCES ref_table(id) ON DELETE CASCADE,
+    row_index  INTEGER NOT NULL,
+    cells_json TEXT NOT NULL,
+    source_row INTEGER NOT NULL,
+    PRIMARY KEY (table_id, row_index)
+);
+
+-- Warlock 的魔能祈喚：不是可以升級的技能，而是達到門檻後取得的固定效果，
+-- 因此不進 feat 表。cost 是佔用的祈喚欄位數。
+CREATE TABLE invocation (
+    id            TEXT PRIMARY KEY,
+    name          TEXT NOT NULL,
+    cost          INTEGER,
+    cost_raw      TEXT,
+    prereq_raw    TEXT,
+    effect        TEXT NOT NULL,
+    source_sheet  TEXT NOT NULL,
+    source_row    INTEGER NOT NULL,
+    source_col    INTEGER NOT NULL,
+    UNIQUE (source_sheet, source_row, source_col)
 );
 
 -- 勘誤 ------------------------------------------------------------------

@@ -1,0 +1,7 @@
+sheet: FATE特規
+kind: prose
+# 第 1 列「從者五圍能力」與第 7 列「職階技能」只有標題沒有內容，
+# 解析器會把它們記成章節，底下的條目自動歸屬。
+levels:
+  - {name_col: 1, body_col: 2}
+promote_headerless: true

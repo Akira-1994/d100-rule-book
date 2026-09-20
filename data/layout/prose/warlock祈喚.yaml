@@ -1,0 +1,5 @@
+sheet: 特殊職業(warlock)
+kind: invocations
+note_row: 3
+rows: [5, 65]
+cols: {name: 11, cost: 12, prereq: 13, effect: 14}

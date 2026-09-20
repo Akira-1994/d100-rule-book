@@ -1,0 +1,7 @@
+sheet: 特殊職業2
+kind: tables
+tables:
+  - name: 咒火能量等級
+    columns: [項目, 對應範圍, 效果]
+    rows: [6, 12]
+    cols: [4, 6]

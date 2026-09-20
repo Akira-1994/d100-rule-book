@@ -1,0 +1,6 @@
+sheet: 大陸簡史
+kind: prose
+# 三欄：紀元（合併儲存格，只在該段第一列有值）、年代、事件。
+levels:
+  - {name_col: 1, body_col: 3}
+  - {name_col: 2, body_col: 3}

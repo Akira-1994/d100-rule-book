@@ -1,0 +1,11 @@
+sheet: 詞墜(依物品分類)
+kind: tables
+# 「詞綴條數量分布」是橫著排的：三列分別是條數、機率區間、機率，
+# 每一欄才是一筆資料，因此用 transpose。
+tables:
+  - {name: 詞綴條數分布：混沌石通用, columns: [詞綴條數, 機率區間, 機率], rows: [2, 4],   cols: [13, 17], transpose: true, note_row: 1}
+  - {name: 詞綴條數分布：戒指,       columns: [詞綴條數, 機率區間, 機率], rows: [6, 8],   cols: [7, 15],  transpose: true}
+  - {name: 詞綴條數分布：武器頭飾等, columns: [詞綴條數, 機率區間, 機率], rows: [6, 8],   cols: [16, 22], transpose: true}
+  - {name: 詞綴條數分布：腰帶,       columns: [詞綴條數, 機率區間, 機率], rows: [10, 12], cols: [3, 8],   transpose: true}
+  - {name: 詞綴條數分布：鎧甲項鍊等, columns: [詞綴條數, 機率區間, 機率], rows: [10, 12], cols: [9, 16],  transpose: true}
+  - {name: 詞綴條數分布：法杖,       columns: [詞綴條數, 機率區間, 機率], rows: [10, 12], cols: [17, 26], transpose: true}

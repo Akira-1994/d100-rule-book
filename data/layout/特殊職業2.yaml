@@ -1,0 +1,22 @@
+sheet: 特殊職業2
+path_kind: 職業
+class_name: 特殊職業
+category_source: name
+# 這張表並排三個互不相干的職業，而且三個的欄位配置都不一樣，
+# 因此拆成三個區域各自宣告。
+regions:
+  # 魔射手：名稱帶分類註記（「奧法箭 （戰鬥）」），三欄。
+  # R7~R14 的「奧法特性」是名稱＋敘述的被動列，解析器會自動收成 class_trait。
+  - blocks: [{col: 1, class_name: 魔射手}]
+    columns: [name, difficulty, effect]
+
+  # 咒火使者：同樣三欄。R6~R12 是「咒火能量等級」對照表，版面完全不同，
+  # 在此跳過，另以 data/layout/tables 宣告。
+  - blocks: [{col: 4, class_name: 咒火使者}]
+    columns: [name, difficulty, effect]
+    skip_rows: [[6, 12]]
+
+  # 魔法舞者：有獨立的分類欄，四欄。
+  - blocks: [{col: 13, class_name: 魔法舞者}]
+    columns: [name, category, difficulty, effect]
+    category_source: column

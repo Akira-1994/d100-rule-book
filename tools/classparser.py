@@ -69,6 +69,7 @@ def split_difficulty_cell(text: str):
     return lines[0], "\n".join(lines[1:])
 # 名稱尾端的分類註記，例如「奧術防禦（知識）」
 _CATEGORY_IN_NAME = re.compile(r"^(?P<name>.+?)\s*[（(](?P<cat>[^（()）]+)[）)]\s*$")
+_WRAPPED = re.compile(r"^[（(]([^（()）]+)[）)]$")
 
 
 def looks_like_difficulty(text: str) -> bool:
@@ -87,6 +88,12 @@ def split_category_from_name(name: str):
     括號內不是已知分類時（例如「專攻武器（咒火）」）就原樣保留名稱，
     不要把武器種類誤當成技能分類。
     """
+    # 整串就是一個括號時（分類自己折成一行的「（感知）」），名稱部分為空。
+    wrapped = _WRAPPED.match(name.strip())
+    if wrapped:
+        categories, unknown = parse_categories(wrapped.group(1))
+        return ("", categories) if categories and not unknown else (name, [])
+
     match = _CATEGORY_IN_NAME.match(name)
     if not match:
         return name, []
@@ -119,6 +126,15 @@ def parse_layout(layout: dict, raw_dir=None):
 
     for region in layout["regions"]:
         row_start, row_end = region.get("rows", [1, len(rows)])
+        # 區塊之間的欄位配置可能不同（特殊職業2 的三個職業就是），
+        # 因此分類來源與跳過列都允許逐區域覆寫。
+        region_category_source = region.get("category_source", category_source)
+        skip_rows = set()
+        for item in region.get("skip_rows", []) or []:
+            if isinstance(item, list):
+                skip_rows.update(range(item[0], item[1] + 1))
+            else:
+                skip_rows.add(item)
         columns = region["columns"]
         extended = region.get("columns_extended")
         width = len(extended or columns)
@@ -155,6 +171,8 @@ def parse_layout(layout: dict, raw_dir=None):
 
             for index in range(row_start - 1, min(row_end, len(rows))):
                 source_row = index + 1
+                if source_row in skip_rows:
+                    continue
                 cells = slice_block(rows[index], block_col, width)
                 if not any(cells):
                     continue
@@ -198,7 +216,7 @@ def parse_layout(layout: dict, raw_dir=None):
 
                 feat, feat_issues = _build_feat(
                     cells, columns, extended, source_row, block_col, sheet,
-                    block_class, current_path, category_source,
+                    block_class, current_path, region_category_source,
                 )
                 issues.extend(feat_issues)
                 feats.append(feat)
@@ -298,8 +316,15 @@ def _build_feat(cells, columns, extended, source_row, source_col, sheet,
         layout_columns = extended
 
     values = dict(zip(layout_columns, cells))
-    name = clean_name(values.get("name", ""))
+    name_raw = values.get("name", "")
+    name = clean_name(name_raw)
     categories = []
+
+    # 分類註記寫在名稱第一行的尾端，但名稱底下可能還折了一行副標，
+    # 例如「飛翔（感知）\n【咒火戰鬥機】」。先只看第一行取分類，
+    # 再把剩下的行接回名稱。
+    name_lines = [line for line in name_raw.split("\n") if line.strip()]
+    head, tail = (name_lines[0], name_lines[1:]) if name_lines else ("", [])
 
     if category_source == "column":
         categories, unknown = parse_categories(values.get("category", ""))
@@ -310,7 +335,18 @@ def _build_feat(cells, columns, extended, source_row, source_col, sheet,
         if not categories:
             issues.append((source_row, "missing_category", f"「{name}」分類欄為空"))
     elif category_source == "name":
-        name, categories = split_category_from_name(name)
+        # 分類註記可能在第一行尾端（「飛翔（感知）」＋副標），
+        # 也可能自己佔一行掛在名稱後面（「專攻武器（咒火）」＋「（感知）」）。
+        # 兩種都試，剝掉帶分類的那一行、其餘接回名稱。
+        stripped_head, categories = split_category_from_name(clean_name(head))
+        if categories:
+            name = clean_name(" ".join([stripped_head] + tail))
+        elif tail:
+            stripped_tail, categories = split_category_from_name(clean_name(tail[-1]))
+            if categories:
+                name = clean_name(
+                    " ".join([head] + tail[:-1] + ([stripped_tail] if stripped_tail else []))
+                )
         if not categories:
             issues.append(
                 (source_row, "missing_category", f"「{name}」名稱沒有分類註記")
@@ -353,3 +389,64 @@ def _build_feat(cells, columns, extended, source_row, source_col, sheet,
         },
         issues,
     )
+
+
+def parse_invocations(layout: dict, raw_dir=None):
+    """解析 Warlock 的魔能祈喚清單。
+
+    祈喚不是可以升級的技能，而是達到環數門檻後取得的固定效果，
+    消耗的是「祈喚欄位」而不是 CP，因此不進 feat 表。
+    """
+    sheet = layout["sheet"]
+    cols = layout["cols"]
+    rows = read_sheet(sheet, raw_dir)
+    row_start, row_end = layout["rows"]
+
+    records, issues = [], []
+    seen = {}
+
+    for index in range(row_start - 1, min(row_end, len(rows))):
+        source_row = index + 1
+        name = clean_name(_at(rows, index, cols["name"]))
+        if not name:
+            continue
+
+        cost_raw = _at(rows, index, cols["cost"]).strip()
+        cost = parse_number(cost_raw)
+        if cost_raw and cost is None:
+            issues.append(
+                (source_row, "cost_not_numeric", f"「{name}」的消耗欄為 {cost_raw!r}")
+            )
+
+        effect = _at(rows, index, cols["effect"]).strip()
+        if not effect:
+            issues.append((source_row, "missing_effect", f"祈喚「{name}」效果欄為空"))
+
+        if name in seen:
+            issues.append(
+                (source_row, "duplicate_invocation",
+                 f"祈喚「{name}」與第 {seen[name]} 列重複")
+            )
+            continue
+        seen[name] = source_row
+
+        records.append(
+            {
+                "id": f"invocation:{name}",
+                "name": name,
+                "cost": int(cost) if cost is not None else None,
+                "cost_raw": cost_raw or None,
+                "prereq_raw": _at(rows, index, cols["prereq"]).strip() or None,
+                "effect": effect,
+                "source_sheet": sheet,
+                "source_row": source_row,
+                "source_col": cols["name"],
+            }
+        )
+
+    return records, issues
+
+
+def _at(rows, row_index, col_1based):
+    from rawio import cell as _cell
+    return _cell(rows, row_index, col_1based - 1)

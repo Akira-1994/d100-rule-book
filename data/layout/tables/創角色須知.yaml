@@ -1,0 +1,7 @@
+sheet: 創角色須知
+kind: tables
+tables:
+  - name: 等級與 CP 總數對照
+    header_row: 13
+    rows: [14, 33]
+    cols: [1, 2]

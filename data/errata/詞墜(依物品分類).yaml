@@ -1,0 +1,25 @@
+sheet: 詞墜(依物品分類)
+entries:
+  - row: 29
+    flag: affix_name_mismatch
+    reason: >-
+      手套分布表的「重拳」在詞綴表裡登錄為「重拳【打臉】」。兩者應為同一條，
+      但名稱不一致會讓程式對不起來。請確認正式名稱是哪一個。
+
+  - row: 66
+    flag: affix_name_mismatch
+    reason: >-
+      法杖分布表的「金屬感知」在詞綴表裡登錄為「金屬偵測感知」。
+      同上，請確認正式名稱。
+
+  - row: 79
+    flag: affix_name_mismatch
+    reason: >-
+      魔導槍械分布表寫「炙焰」，武器分布表與詞綴表寫的是「炙燄」（焰／燄 不同字）。
+      應統一為其中一種。
+
+  - row: 69
+    flag: affix_name_mismatch
+    reason: >-
+      法杖分布表的「閃電增幅」在詞綴表裡查不到。詞綴表有「電擊增幅」與
+      「閃電穿透」，但沒有「閃電增幅」。請確認是筆誤還是漏登的詞綴。

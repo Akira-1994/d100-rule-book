@@ -15,3 +15,24 @@ entries:
     covers: [missing_effect]
     reason: >-
       〈魔能感知〉同上：只有分類（感知）與難度（2），缺少效果敘述。
+
+  # 魔能祈喚清單（C11 區塊）
+  - row: 31
+    col: 11
+    flag: duplicate_invocation
+    covers: [duplicate_invocation]
+    reason: >-
+      〈恐懼言語〉在第 30、31、32 三列完全重複（名稱、消耗、前置、效果
+      四欄逐字相同），應是複製貼上時多貼了兩次。資料庫只保留第 30 列。
+  - row: 32
+    col: 11
+    flag: duplicate_invocation
+    covers: [duplicate_invocation]
+    reason: 〈恐懼言語〉重複，同第 31 列的說明。
+  - row: 65
+    col: 11
+    flag: duplicate_invocation
+    covers: [duplicate_invocation]
+    reason: >-
+      〈殘酷巫咒〉在第 64、65 兩列完全重複（四欄逐字相同）。
+      資料庫只保留第 64 列。

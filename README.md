@@ -4,7 +4,7 @@
 
 完整的四階段開發計劃見 [docs/PLAN.md](docs/PLAN.md)。
 
-目前進度：**Phase 2 — SQLite 規則資料庫（Tier A／B 與 Tier C 第一批完成）**
+目前進度：**Phase 2 完成 — 31 張工作表中的 30 張已納入 SQLite 資料庫**
 
 ## 環境準備
 
@@ -23,7 +23,7 @@ git config core.hooksPath .githooks
 | `data/raw/_merges.tsv` | 所有合併儲存格範圍，用來偵測純版面調整 |
 | `data/raw/_formulas.tsv` | 所有公式（目前集中在「狩獵任務」） |
 | `data/errata/` | 我們對原始資料的修正，連同理由（進 git） |
-| `data/layout/` | 職業表的版面宣告：區塊在哪、欄位順序為何 |
+| `data/layout/` | 版面宣告：職業表的區塊位置、散文層級、對照表範圍 |
 | `db/schema.sql` | SQLite 結構定義 |
 | `dist/d100.db` | 建置產物，**不進 git**，隨時可重建 |
 | `tools/` | 工具鏈 |

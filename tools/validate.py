@@ -281,6 +281,85 @@ def validate_races(connection, report: Report):
     report.checks += 1
 
 
+def validate_reference_data(connection, report: Report):
+    """對照表、散文段落與祈喚的一致性。"""
+    import json
+
+    # 每一列的欄位數必須與表頭一致，否則應用端渲染會錯位。
+    for table_id, name, columns_json in connection.execute(
+        "SELECT id, name, columns_json FROM ref_table"
+    ):
+        columns = json.loads(columns_json)
+        rows = connection.execute(
+            "SELECT row_index, cells_json, source_row FROM ref_row"
+            " WHERE table_id = ? ORDER BY row_index",
+            (table_id,),
+        ).fetchall()
+        if not rows:
+            report.warn(f"對照表「{name}」沒有任何資料列")
+            continue
+        for _index, cells_json, source_row in rows:
+            cells = json.loads(cells_json)
+            if len(cells) != len(columns):
+                report.error(
+                    f"對照表「{name}」第 {source_row} 列有 {len(cells)} 格，"
+                    f"表頭卻是 {len(columns)} 欄"
+                )
+                break
+    report.checks += 1
+
+    empty = connection.execute(
+        "SELECT count(*) FROM rule_text WHERE trim(body) = ''"
+    ).fetchone()[0]
+    report.check(empty == 0, f"rule_text 有 {empty} 段是空白內容")
+
+    bad_cost = connection.execute(
+        "SELECT name, cost_raw FROM invocation WHERE cost IS NULL OR cost <= 0"
+    ).fetchall()
+    for name, cost_raw in bad_cost:
+        report.warn(f"祈喚「{name}」的消耗欄 {cost_raw!r} 不是正整數")
+
+    duplicates = connection.execute(
+        "SELECT name, count(*) FROM invocation GROUP BY name HAVING count(*) > 1"
+    ).fetchall()
+    report.check(
+        not duplicates, f"祈喚名稱重複：{[d[0] for d in duplicates]}"
+    )
+
+    no_prereq = connection.execute(
+        "SELECT count(*) FROM invocation WHERE prereq_raw IS NULL"
+    ).fetchone()[0]
+    if no_prereq:
+        report.warn(f"有 {no_prereq} 條祈喚沒有填寫前置條件")
+
+    # 混沌石分布表引用的詞綴應該都能在詞綴表裡找到。對不起來多半是錯字，
+    # 也可能是分布表寫的是一整類效果（「CHA 增加」）而非單一詞綴名。
+    # 比對時忽略空白：分布表寫「RES增加」、詞綴表寫「RES 增加」，
+    # 那是排版差異而不是兩條不同的詞綴。
+    known = {
+        name.replace(" ", "")
+        for (name,) in connection.execute("SELECT name FROM affix")
+    }
+    unknown_affixes = {}
+    for name, count in connection.execute(
+        "SELECT affix_name, count(*) FROM affix_distribution"
+        " GROUP BY affix_name ORDER BY 2 DESC"
+    ):
+        if name.replace(" ", "") not in known:
+            unknown_affixes[name] = count
+
+    if unknown_affixes:
+        total = sum(unknown_affixes.values())
+        listed = "、".join(
+            f"{name}×{count}" for name, count in list(unknown_affixes.items())[:8]
+        )
+        report.warn(
+            f"詞綴分布表引用了 {len(unknown_affixes)} 個詞綴表裡查不到的名稱"
+            f"（共 {total} 處）：{listed}"
+        )
+    report.checks += 1
+
+
 def validate_rule_formulas(report: Report):
     """拿「法師範例」那張實際角色卡回歸驗證 rules.py。
 
@@ -376,6 +455,7 @@ def main(argv=None) -> int:
     validate_affixes(connection, report)
     validate_materials(connection, report)
     validate_races(connection, report)
+    validate_reference_data(connection, report)
     validate_rule_formulas(report)
     connection.close()
 

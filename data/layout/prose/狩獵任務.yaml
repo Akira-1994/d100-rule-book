@@ -1,0 +1,6 @@
+sheet: 狩獵任務
+kind: prose
+mode: explicit
+blocks:
+  - {col: 1, title_row: 1, rows: [1, 1]}
+  - {col: 4, title_row: 1, rows: [1, 1]}

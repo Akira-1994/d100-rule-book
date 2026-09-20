@@ -1,0 +1,18 @@
+sheet: 詞墜(依物品分類)
+kind: affix_distribution
+# 十三個部位，每個區塊一列表頭（加一、加二…）、底下列出該加值等級
+# 可以擲出的詞綴。每個加值等級橫跨兩欄。
+blocks:
+  - {slot: 武器,     header_row: 14, rows: [15, 22], cols: [1, 14]}
+  - {slot: 頭環,     header_row: 14, rows: [15, 22], cols: [15, 28]}
+  - {slot: 手套,     header_row: 24, rows: [25, 32], cols: [1, 14]}
+  - {slot: 戒指,     header_row: 24, rows: [25, 32], cols: [15, 28]}
+  - {slot: 手環,     header_row: 34, rows: [35, 42], cols: [1, 14]}
+  - {slot: 盾牌,     header_row: 34, rows: [35, 42], cols: [15, 28]}
+  - {slot: 披風,     header_row: 44, rows: [45, 52], cols: [1, 14]}
+  - {slot: 鎧甲,     header_row: 44, rows: [45, 52], cols: [15, 28]}
+  - {slot: 項鍊,     header_row: 54, rows: [55, 62], cols: [1, 14]}
+  - {slot: 腰帶,     header_row: 54, rows: [55, 62], cols: [15, 28]}
+  - {slot: 鞋子,     header_row: 64, rows: [65, 72], cols: [1, 14]}
+  - {slot: 法杖,     header_row: 64, rows: [65, 72], cols: [15, 28]}
+  - {slot: 魔導槍械, header_row: 74, rows: [75, 82], cols: [1, 14]}

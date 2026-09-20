@@ -1,0 +1,7 @@
+sheet: 戰鬥流程
+kind: prose
+# 兩層結構：C6 是大步驟、C7 是其說明；若 C6 空白而 C7 有值，
+# 那是該步驟底下的細項（一般動作／自由動作／移動／傷害計算…），C8 是說明。
+levels:
+  - {name_col: 6, body_col: 7}
+  - {name_col: 7, body_col: 8}

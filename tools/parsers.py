@@ -22,6 +22,7 @@ from pathlib import Path
 import yaml
 
 import classparser
+import proseparser
 from rawio import (
     REPO_ROOT,
     cell,
@@ -615,10 +616,44 @@ def parse_all(raw_dir=None):
         rule_texts.extend(sheet_notes)
         issues.extend((layout["sheet"],) + i for i in sheet_issues)
 
+    # 散文規則、小型對照表與 Warlock 祈喚：同樣由 data/layout 宣告位置。
+    ref_tables, ref_rows, invocations, affix_distribution = [], [], [], []
+    layout_root = REPO_ROOT / "data" / "layout"
+
+    for layout_path in sorted((layout_root / "prose").glob("*.yaml")):
+        layout = yaml.safe_load(layout_path.read_text(encoding="utf-8"))
+        sheet = layout["sheet"]
+        if layout.get("kind") == "invocations":
+            records, sheet_issues = classparser.parse_invocations(layout, raw_dir)
+            invocations.extend(records)
+        elif layout.get("kind") == "affix_distribution":
+            records, sheet_issues = proseparser.parse_affix_distribution(
+                layout, raw_dir
+            )
+            affix_distribution.extend(records)
+        elif layout.get("mode") == "explicit":
+            records, sheet_issues = proseparser.parse_prose_explicit(layout, raw_dir)
+            rule_texts.extend(records)
+        else:
+            records, sheet_issues = proseparser.parse_prose(layout, raw_dir)
+            rule_texts.extend(records)
+        issues.extend((sheet,) + i for i in sheet_issues)
+
+    for layout_path in sorted((layout_root / "tables").glob("*.yaml")):
+        layout = yaml.safe_load(layout_path.read_text(encoding="utf-8"))
+        tables, table_rows, sheet_issues = proseparser.parse_tables(layout, raw_dir)
+        ref_tables.extend(tables)
+        ref_rows.extend(table_rows)
+        issues.extend((layout["sheet"],) + i for i in sheet_issues)
+
     return {
         "feats": feats,
         "class_paths": class_paths,
         "class_traits": class_traits,
+        "ref_tables": ref_tables,
+        "ref_rows": ref_rows,
+        "invocations": invocations,
+        "affix_distribution": affix_distribution,
         "races": races,
         "affixes": affixes,
         "materials": materials,

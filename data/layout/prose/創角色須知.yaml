@@ -1,0 +1,6 @@
+sheet: 創角色須知
+kind: prose
+# 第 12 列之後是「等級 → CP 總數」對照表，另以 tables 宣告。
+rows: [1, 11]
+levels:
+  - {name_col: 1, body_col: 2}

@@ -1,0 +1,4 @@
+sheet: 世界觀
+kind: prose
+levels:
+  - {name_col: 1, body_col: 2}

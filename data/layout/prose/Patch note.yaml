@@ -1,0 +1,7 @@
+sheet: Patch note
+kind: prose
+# C1 是版本或項次、C2 是變更內容。只有版本標題列（1.1更動、1.2nerf…）
+# 沒有 C2，會被記成章節。
+levels:
+  - {name_col: 1, body_col: 2}
+promote_headerless: true

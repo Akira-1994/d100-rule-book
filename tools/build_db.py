@@ -71,7 +71,8 @@ def load_errata() -> list:
 
 
 RECORD_BUCKETS = ("feats", "races", "affixes", "materials",
-                  "material_affixes", "class_paths", "class_traits")
+                  "material_affixes", "class_paths", "class_traits",
+                  "invocations")
 
 # 勘誤 YAML 裡寫單數的 target（讀起來比較自然），對應到內部的資料桶名稱。
 TARGET_BUCKETS = {
@@ -82,6 +83,7 @@ TARGET_BUCKETS = {
     "material_affix": "material_affixes",
     "class_path": "class_paths",
     "class_trait": "class_traits",
+    "invocation": "invocations",
 }
 
 
@@ -99,6 +101,19 @@ def index_records(data: dict) -> dict:
     return index
 
 
+def _flag_row(entry: dict) -> dict:
+    return {
+        "sheet": entry["sheet"],
+        "source_row": entry["row"],
+        "field": None,
+        "action": "flag",
+        "raw_value": None,
+        "fixed_value": None,
+        "issue": entry["flag"],
+        "reason": entry["reason"],
+    }
+
+
 def apply_errata(data: dict, entries: list) -> list:
     """把勘誤套用到解析結果上，回傳要寫進 errata 表的列。"""
     index = index_records(data)
@@ -107,7 +122,15 @@ def apply_errata(data: dict, entries: list) -> list:
 
     for entry in entries:
         key = (entry["sheet"], entry["row"])
+        flag_only = "flag" in entry and not entry.get("set")
+
         if key not in index:
+            # 純標記的勘誤談的是「原表這一列有問題」，不一定有對應的紀錄 ——
+            # 被判定為重複而丟棄的列就是這種情況。只有要修改欄位時，
+            # 才非得先找到那筆紀錄不可。
+            if flag_only:
+                rows.append(_flag_row(entry))
+                continue
             raise SystemExit(
                 f"{entry['file']}：找不到 {entry['sheet']} 第 {entry['row']} 列，"
                 "勘誤可能已經過期（原表列號變動了？）。"
@@ -122,6 +145,9 @@ def apply_errata(data: dict, entries: list) -> list:
                 if record.get("source_col", 1) == entry["col"]
             ]
             if not narrowed:
+                if flag_only:
+                    rows.append(_flag_row(entry))
+                    continue
                 columns = sorted({r.get("source_col", 1) for _b, r in candidates})
                 raise SystemExit(
                     f"{entry['file']}：第 {entry['row']} 列沒有 col={entry['col']} 的紀錄"
@@ -152,18 +178,7 @@ def apply_errata(data: dict, entries: list) -> list:
             record = candidates[0][1]
 
         if "flag" in entry:
-            rows.append(
-                {
-                    "sheet": entry["sheet"],
-                    "source_row": entry["row"],
-                    "field": None,
-                    "action": "flag",
-                    "raw_value": None,
-                    "fixed_value": None,
-                    "issue": entry["flag"],
-                    "reason": entry["reason"],
-                }
-            )
+            rows.append(_flag_row(entry))
 
         for field, value in (entry.get("set") or {}).items():
             if field == "parent":
@@ -206,6 +221,10 @@ def normalize_records(data: dict):
         record.setdefault("class_path_id", None)
         record.setdefault("tags", [])
         record.setdefault("source_col", 1)
+    for record in data["rule_texts"]:
+        record.setdefault("section", None)
+        record.setdefault("subsection", None)
+        record.setdefault("sort_order", 0)
 
 
 def build(out_path: Path, raw_dir: Path) -> dict:
@@ -366,9 +385,37 @@ def build(out_path: Path, raw_dir: Path) -> dict:
         data["material_affixes"],
     )
     connection.executemany(
-        """INSERT INTO rule_text (sheet, source_row, source_col, body)
-           VALUES (:sheet, :source_row, :source_col, :body)""",
+        """INSERT INTO rule_text (sheet, section, subsection, body, sort_order,
+                                  source_row, source_col)
+           VALUES (:sheet, :section, :subsection, :body, :sort_order,
+                   :source_row, :source_col)""",
         data["rule_texts"],
+    )
+    connection.executemany(
+        """INSERT INTO ref_table (id, sheet, name, note, columns_json,
+                                  sort_order, source_row, source_col)
+           VALUES (:id, :sheet, :name, :note, :columns_json,
+                   :sort_order, :source_row, :source_col)""",
+        data["ref_tables"],
+    )
+    connection.executemany(
+        """INSERT INTO ref_row (table_id, row_index, cells_json, source_row)
+           VALUES (:table_id, :row_index, :cells_json, :source_row)""",
+        data["ref_rows"],
+    )
+    connection.executemany(
+        """INSERT INTO affix_distribution (slot, plus_label, affix_name,
+                                           source_sheet, source_row, source_col)
+           VALUES (:slot, :plus_label, :affix_name,
+                   :source_sheet, :source_row, :source_col)""",
+        data["affix_distribution"],
+    )
+    connection.executemany(
+        """INSERT INTO invocation (id, name, cost, cost_raw, prereq_raw, effect,
+                                   source_sheet, source_row, source_col)
+           VALUES (:id, :name, :cost, :cost_raw, :prereq_raw, :effect,
+                   :source_sheet, :source_row, :source_col)""",
+        data["invocations"],
     )
 
     connection.executemany(
@@ -407,6 +454,10 @@ def build(out_path: Path, raw_dir: Path) -> dict:
         "materials": len(data["materials"]),
         "material_affixes": len(data["material_affixes"]),
         "rule_texts": len(data["rule_texts"]),
+        "ref_tables": len(data["ref_tables"]),
+        "ref_rows": len(data["ref_rows"]),
+        "invocations": len(data["invocations"]),
+        "affix_distribution": len(data["affix_distribution"]),
         "errata": len(errata_rows),
         "manual_errata": len(errata_entries),
     }
@@ -427,7 +478,9 @@ def main(argv=None) -> int:
         f"被動特性 {stats['class_traits']}）、"
         f"種族 {stats['races']}、詞綴 {stats['affixes']}、"
         f"素材 {stats['materials']}（素材詞綴 {stats['material_affixes']}）、"
-        f"規則段落 {stats['rule_texts']}"
+        f"規則段落 {stats['rule_texts']}、對照表 {stats['ref_tables']}"
+        f"（{stats['ref_rows']} 列）、祈喚 {stats['invocations']}、"
+        f"詞綴分布 {stats['affix_distribution']}"
     )
     print(
         f"  勘誤紀錄 {stats['errata']} 筆（其中人工勘誤 {stats['manual_errata']} 筆）"
