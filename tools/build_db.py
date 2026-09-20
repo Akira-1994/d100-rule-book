@@ -48,6 +48,18 @@ AUTO_ISSUE_FIELDS = {
 }
 
 
+def load_slot_mapping() -> dict:
+    """讀入裝備欄位清單與「詞綴部位 → 裝備欄位」的對應。"""
+    path = ERRATA_DIR / "_裝備欄位對應.yaml"
+    if not path.is_file():
+        return {"slots": [], "mappings": []}
+    document = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return {
+        "slots": document.get("equipment_slots", []) or [],
+        "mappings": document.get("mappings", []) or [],
+    }
+
+
 def load_affix_aliases() -> dict:
     """讀入 data/errata/*.yaml 裡的詞綴名稱別名對照。
 
@@ -58,6 +70,8 @@ def load_affix_aliases() -> dict:
         return {}
     aliases = {}
     for path in sorted(ERRATA_DIR.glob("*.yaml")):
+        if path.name.startswith("_"):
+            continue
         document = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         for item in document.get("affix_name_aliases", []) or []:
             if not item.get("reason"):
@@ -71,7 +85,10 @@ def load_errata() -> list:
     if not ERRATA_DIR.is_dir():
         return []
     entries = []
+    # 底線開頭的是設定檔（例如 _裝備欄位對應.yaml）而不是逐列勘誤，跳過。
     for path in sorted(ERRATA_DIR.glob("*.yaml")):
+        if path.name.startswith("_"):
+            continue
         document = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         sheet = document.get("sheet")
         if not sheet:
@@ -473,6 +490,23 @@ def build(out_path: Path, raw_dir: Path) -> dict:
            VALUES (:table_id, :row_index, :cells_json, :source_row)""",
         data["ref_rows"],
     )
+    slot_mapping = load_slot_mapping()
+    connection.executemany(
+        "INSERT INTO equipment_slot (code, sort_order, note) VALUES (?, ?, ?)",
+        [
+            (item["code"], order, item.get("note"))
+            for order, item in enumerate(slot_mapping["slots"])
+        ],
+    )
+    connection.executemany(
+        "INSERT INTO affix_slot_mapping (affix_slot, equipment_slot) VALUES (?, ?)",
+        [
+            (item["affix_slot"], slot)
+            for item in slot_mapping["mappings"]
+            for slot in item["slots"]
+        ],
+    )
+
     connection.executemany(
         """INSERT INTO affix_distribution (slot, plus_label, affix_name,
                                            source_sheet, source_row, source_col)

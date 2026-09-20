@@ -235,6 +235,40 @@ def validate_affixes(connection, report: Report):
     report.checks += 1
 
 
+def validate_slot_mapping(connection, report: Report):
+    """每個實際出現過的詞綴部位都必須對應到至少一個裝備欄位。
+
+    少了對應，Phase 4 就無法判斷這條詞綴能不能附在某件裝備上。
+    """
+    unmapped = connection.execute(
+        "SELECT DISTINCT slot FROM affix_slot"
+        " WHERE slot NOT IN (SELECT affix_slot FROM affix_slot_mapping)"
+        " UNION"
+        " SELECT DISTINCT slot FROM material_slot"
+        " WHERE slot NOT IN (SELECT affix_slot FROM affix_slot_mapping)"
+    ).fetchall()
+    report.check(
+        not unmapped,
+        f"這些詞綴部位還沒有對應到裝備欄位：{[u[0] for u in unmapped]}"
+        "（請補進 data/errata/_裝備欄位對應.yaml）",
+    )
+
+    dangling = connection.execute(
+        "SELECT DISTINCT equipment_slot FROM affix_slot_mapping"
+        " WHERE equipment_slot NOT IN (SELECT code FROM equipment_slot)"
+    ).fetchall()
+    report.check(
+        not dangling, f"對應到不存在的裝備欄位：{[d[0] for d in dangling]}"
+    )
+
+    unused = connection.execute(
+        "SELECT code FROM equipment_slot"
+        " WHERE code NOT IN (SELECT equipment_slot FROM affix_slot_mapping)"
+    ).fetchall()
+    for (code,) in unused:
+        report.warn(f"裝備欄位「{code}」沒有任何詞綴部位對應到它")
+
+
 def validate_materials(connection, report: Report):
     """素材詞綴的機率區間必須不重不漏地蓋滿 1~100。
 
@@ -487,6 +521,7 @@ def main(argv=None) -> int:
     validate_feats(connection, report)
     validate_prereq_graph(connection, report)
     validate_affixes(connection, report)
+    validate_slot_mapping(connection, report)
     validate_materials(connection, report)
     validate_races(connection, report)
     validate_reference_data(connection, report)

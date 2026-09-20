@@ -178,6 +178,26 @@ CREATE TABLE affix_rank (
     PRIMARY KEY (affix_id, rank, condition)
 );
 
+-- 裝備欄位 --------------------------------------------------------------
+
+-- 角色卡上的裝備欄位。範例卡只有十格且把武器與盾牌塞在「其他」，
+-- 這裡依規則書作者 2026-09-20 的裁示補上主手與副手兩格 ——
+-- 「主手／副手」是規則書自己的用語（見〈武器使用(充能斧)〉與〈雙手武器大師〉）。
+CREATE TABLE equipment_slot (
+    code       TEXT PRIMARY KEY,
+    sort_order INTEGER NOT NULL,
+    note       TEXT
+);
+
+-- 詞綴表寫的是物品種類（武器、鎧甲、頭環…），角色卡寫的是身體欄位。
+-- 這張表把兩套詞彙接起來，一種部位可以對應多個欄位
+-- （戒指對應左右兩格；武器類主手副手都能放）。
+CREATE TABLE affix_slot_mapping (
+    affix_slot     TEXT NOT NULL,
+    equipment_slot TEXT NOT NULL REFERENCES equipment_slot(code),
+    PRIMARY KEY (affix_slot, equipment_slot)
+);
+
 -- 混沌石擲出詞綴時，可能出現哪些詞綴由「部位 × 魔法物品加值」決定。
 -- 這裡是那張對照表的展開：每一列代表「某部位在某個加值等級可以出現某條詞綴」。
 CREATE TABLE affix_distribution (
