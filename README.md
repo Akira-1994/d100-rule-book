@@ -4,8 +4,9 @@
 
 完整的四階段開發計劃見 [docs/PLAN.md](docs/PLAN.md)。
 
-目前進度：**Phase 2 完成** — 31 張工作表中的 30 張已納入 SQLite 資料庫，
-規則層級疑問已於 2026-09-20 由作者全數裁示（見 [docs/規則裁示紀錄.md](docs/規則裁示紀錄.md)）。
+目前進度：**Phase 3 進行中** — 規則書瀏覽應用可跑，具備搜尋、篩選與專長詳情。
+Phase 2 已完成：31 張工作表中的 30 張納入 SQLite，規則層級疑問於 2026-09-20 由作者
+全數裁示（見 [docs/規則裁示紀錄.md](docs/規則裁示紀錄.md)）。
 
 ## 環境準備
 
@@ -27,7 +28,8 @@ git config core.hooksPath .githooks
 | `data/layout/` | 版面宣告：職業表的區塊位置、散文層級、對照表範圍 |
 | `db/schema.sql` | SQLite 結構定義 |
 | `dist/d100.db` | 建置產物，**不進 git**，隨時可重建 |
-| `tools/` | 工具鏈 |
+| `tools/` | 資料管線工具鏈 |
+| `app/` | Tauri + React 規則書應用（見 [app/README.md](app/README.md)） |
 | `docs/PLAN.md` | 開發計劃 |
 | `docs/勘誤清單.md` | 自動產生，可直接拿去跟規則書作者對帳 |
 | `docs/規則裁示紀錄.md` | 規則層級疑問與作者的裁示（手寫） |
@@ -63,6 +65,18 @@ python tools/errata_report.py --out docs/勘誤清單.md
 ```bash
 python tools/extract.py && python tools/verify_extract.py && python tools/build_db.py && python tools/validate.py
 ```
+
+## 執行應用
+
+```bash
+cd app
+npm install
+npm run sync-db
+npm run tauri dev
+```
+
+首次建置要編譯 Rust 相依，約需一到兩分鐘。需要 Node.js 與 Rust 工具鏈，
+Windows 上另需 WebView2 Runtime 與 MSVC C++ Build Tools。
 
 ## 修正規則書的錯誤
 

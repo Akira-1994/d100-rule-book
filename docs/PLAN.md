@@ -187,22 +187,35 @@ errata             -- 所有修正與標記，連同理由
 category / attribute / build_info
 ```
 
-尚待 Tier C 建立：`class_path`（學派／血脈／領域／結社統一模型）、
-`item_price`、`hunt_table`。
+Tier C 另外建立：`class_path`（學派／血脈／領域／結社統一模型）、`class_trait`、
+`invocation`、`ref_table` / `ref_row`（31 張小型對照表）、`affix_distribution`，
+以及 `equipment_slot` / `affix_slot_mapping`（詞綴部位 → 角色卡欄位）。
 
-- [ ] `tools/build_db.py`：raw + `data/errata/*.yaml` → `dist/d100.db`
-- [ ] `tools/validate.py`：前置專長存在性、難度為正數、分類白名單、詞綴部位白名單、CP 公式抽查；失敗即中斷建置
-- [ ] 前置條件解析器：解析不出的標 `kind=free`，保留 `raw_text` 僅顯示不驗證
+- [x] `tools/build_db.py`：raw + `data/errata/*.yaml` → `dist/d100.db`
+- [x] `tools/validate.py`：43 項檢查，含前置成環偵測、素材機率區間覆蓋、
+      詞綴部位對應完整性，以及拿「法師範例」回歸驗證 `rules.py` 的公式
+- [x] `tools/errata_report.py`：把 errata 表整理成可直接對帳的清單
+- [x] 前置條件解析器：94%（167/178）已結構化，其餘標 `kind=free` 僅顯示不驗證
 
 **勘誤原則**：DB 為建置產物，所有修正寫在 git 內的 YAML，永遠可重現、可追溯、可回推給規則書作者。
 
 ## Phase 3 — 規則書瀏覽／編輯應用（Tauri）
 
-- [ ] 全文搜尋（專長名／效果內文）＋ 分類、難度、來源多重篩選
-- [ ] 專長詳情頁：前置鏈往上追、被誰當前置往下追、等級 0–5 CP 成本表
+- [x] 全文搜尋（專長名／效果內文）＋ 分組、分類多重篩選
+- [x] 專長詳情頁：前置鏈往上追、被誰當前置往下追、等級 0–5 CP 成本表
+- [x] 詳情頁顯示該條目的勘誤紀錄與原始來源（工作表＋列號）
+- [ ] 種族、詞綴、素材、對照表的瀏覽頁
+- [ ] 規則散文頁（創角須知、戰鬥流程等）
 - [ ] 新增／修改／刪除：編輯一律寫成 errata / override YAML 並進 git，附變更歷史
 - [ ] 版本比對頁：接 Phase 1 的 diff 報告，顯示版本間差異
-- [ ] 規則散文頁（創角須知、戰鬥流程等）以 Markdown 呈現
+
+**技術決定**
+
+資料庫唯讀。編輯功能是改 `data/errata` 的 YAML 再重建資料庫，而不是直接寫
+`.db` —— 直接改會讓修改失去可追溯性，也違背「SQLite 是建置產物」這個前提。
+
+後端邏輯有 `cargo test --lib` 的測試，直接跑在真正的 `dist/d100.db` 上。
+造假資料在這裡沒有意義，我們要驗的正是「查詢能不能正確對付這份資料的形狀」。
 
 ## Phase 4 — 角色卡建立與跑團模式
 
