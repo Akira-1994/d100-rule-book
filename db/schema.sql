@@ -37,14 +37,26 @@ CREATE TABLE attribute (
 CREATE TABLE feat (
     id             TEXT PRIMARY KEY,
     name           TEXT NOT NULL,
-    feat_group     TEXT NOT NULL,   -- basic / general / advanced / metamagic
+    -- basic / general / advanced / metamagic / crafting / legendary
+    feat_group     TEXT NOT NULL,
     difficulty     REAL,            -- 非固定難度時為 NULL
-    difficulty_raw TEXT,            -- 原始字串，例如 '1or2'
+    difficulty_raw TEXT,            -- 原始字串，例如 '1or2'、'傳1（知識）'
+    -- 難度的計價單位。'cp' 走 2^等級×難度 的一般公式；
+    -- 'legend' 是傳奇技能點，依傳奇專長表前言，一點需以 10 點 CP 兌換。
+    difficulty_scale TEXT NOT NULL DEFAULT 'cp',
     parent_id      TEXT REFERENCES feat(id),
     effect         TEXT NOT NULL,
     source_sheet   TEXT NOT NULL,
     source_row     INTEGER NOT NULL,
     UNIQUE (source_sheet, source_row)
+);
+
+-- 條目上的附註標記，例如製作專長名稱尾端的 ** 代表可由「賢者之觸」
+-- 詞墜提升等級。用標籤表而不是布林欄位，之後再冒出別的標記不必改 schema。
+CREATE TABLE feat_tag (
+    feat_id TEXT NOT NULL REFERENCES feat(id) ON DELETE CASCADE,
+    tag     TEXT NOT NULL,
+    PRIMARY KEY (feat_id, tag)
 );
 
 CREATE INDEX idx_feat_group ON feat(feat_group);
@@ -127,6 +139,58 @@ CREATE TABLE affix_rank (
     plus_cost INTEGER NOT NULL,
     condition TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (affix_id, rank, condition)
+);
+
+-- 素材與素材詞綴 --------------------------------------------------------
+
+CREATE TABLE material (
+    id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL,
+    material_tier   INTEGER,   -- 素材階級
+    cost_multiplier REAL,      -- 加工費用倍率
+    source_sheet    TEXT NOT NULL,
+    source_row      INTEGER NOT NULL,
+    UNIQUE (source_sheet, source_row)
+);
+
+CREATE TABLE material_slot (
+    material_id TEXT NOT NULL REFERENCES material(id) ON DELETE CASCADE,
+    slot        TEXT NOT NULL,
+    PRIMARY KEY (material_id, slot)
+);
+
+-- 附上素材詞綴時擲一次 D100，落在哪個區間就得到哪一條詞綴。
+--
+-- tier_rank 是該素材的第幾個強度階（1 最弱）。同一階可能有不只一條詞綴 ——
+-- 精金與密銀就是一條給武器、一條給主要裝備與盾牌，兩者共用同一個機率區間，
+-- 依實際附在哪種裝備上決定生效的是哪一條。
+CREATE TABLE material_affix (
+    id                TEXT PRIMARY KEY,
+    material_id       TEXT NOT NULL REFERENCES material(id) ON DELETE CASCADE,
+    name              TEXT NOT NULL,
+    tier_rank         INTEGER NOT NULL,
+    rarity_multiplier REAL,
+    roll_min          INTEGER NOT NULL,
+    roll_max          INTEGER NOT NULL,
+    effect            TEXT NOT NULL,
+    source_sheet      TEXT NOT NULL,
+    source_row        INTEGER NOT NULL,
+    UNIQUE (source_sheet, source_row)
+);
+
+CREATE INDEX idx_material_affix_material ON material_affix(material_id);
+
+-- 規則散文 --------------------------------------------------------------
+
+-- 表頭之前的前言區塊：製作耗時、傳奇專長的解鎖門檻、CP 計算公式等。
+-- 這些不在表格裡但一樣是規則，不能因為版面不同就丟掉。
+CREATE TABLE rule_text (
+    id           INTEGER PRIMARY KEY,
+    sheet        TEXT NOT NULL,
+    source_row   INTEGER NOT NULL,
+    source_col   INTEGER NOT NULL,
+    body         TEXT NOT NULL,
+    UNIQUE (sheet, source_row, source_col)
 );
 
 -- 勘誤 ------------------------------------------------------------------

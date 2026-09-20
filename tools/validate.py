@@ -177,6 +177,61 @@ def validate_affixes(connection, report: Report):
     report.checks += 1
 
 
+def validate_materials(connection, report: Report):
+    """素材詞綴的機率區間必須不重不漏地蓋滿 1~100。
+
+    附素材詞綴時是擲一次 D100 查表，所以區間若有重疊就會出現「擲到 71
+    同時符合兩條」的歧義，有斷層則會擲出查不到東西的結果。
+    """
+    by_material = {}
+    for material_id, name, rank, low, high, row in connection.execute(
+        "SELECT a.material_id, m.name, a.tier_rank, a.roll_min, a.roll_max,"
+        "       a.source_row"
+        " FROM material_affix a JOIN material m ON m.id = a.material_id"
+        " ORDER BY a.material_id, a.roll_min, a.tier_rank"
+    ):
+        by_material.setdefault((material_id, name), []).append((low, high, rank, row))
+
+    for (_material_id, name), spans in by_material.items():
+        # 同一階的多條詞綴共用區間（武器用／防具用），比對時只取一次。
+        unique = sorted({(low, high) for low, high, _rank, _row in spans})
+
+        if unique[0][0] != 1:
+            report.warn(f"素材「{name}」的機率區間從 {unique[0][0]} 開始，未涵蓋 1")
+        if unique[-1][1] != 100:
+            report.warn(f"素材「{name}」的機率區間到 {unique[-1][1]} 為止，未涵蓋 100")
+
+        for (low_a, high_a), (low_b, high_b) in zip(unique, unique[1:]):
+            if low_b <= high_a:
+                report.error(
+                    f"素材「{name}」的機率區間重疊：{low_a}~{high_a} 與 {low_b}~{high_b}"
+                    f"（擲出 {low_b}~{high_a} 時會同時符合兩條詞綴）"
+                )
+            elif low_b != high_a + 1:
+                report.warn(
+                    f"素材「{name}」的機率區間有斷層：{high_a} 與 {low_b} 之間"
+                    f"（擲出 {high_a + 1}~{low_b - 1} 時查不到詞綴）"
+                )
+
+    bad = connection.execute(
+        "SELECT id FROM material_affix WHERE roll_min < 1 OR roll_max > 100"
+        " OR roll_min > roll_max"
+    ).fetchall()
+    report.check(not bad, f"機率區間超出 1~100 或起迄顛倒：{len(bad)} 筆")
+
+    for name, sheet, row in connection.execute(
+        "SELECT m.name, m.source_sheet, m.source_row FROM material m"
+        " WHERE NOT EXISTS (SELECT 1 FROM material_affix a WHERE a.material_id = m.id)"
+    ):
+        report.warn(f"{sheet} 第 {row} 列素材「{name}」沒有任何詞綴")
+
+    for (slot,) in connection.execute("SELECT DISTINCT slot FROM material_slot"):
+        if slot not in KNOWN_SLOTS:
+            report.warn(f"素材部位出現未見過的 {slot!r}，請確認不是錯字或新制")
+
+    report.checks += 1
+
+
 def validate_races(connection, report: Report):
     unknown = connection.execute(
         "SELECT DISTINCT attr FROM race_attr_modifier"
@@ -290,6 +345,7 @@ def main(argv=None) -> int:
     validate_feats(connection, report)
     validate_prereq_graph(connection, report)
     validate_affixes(connection, report)
+    validate_materials(connection, report)
     validate_races(connection, report)
     validate_rule_formulas(report)
     connection.close()

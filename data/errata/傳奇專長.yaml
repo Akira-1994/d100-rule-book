@@ -1,0 +1,9 @@
+sheet: 傳奇專長
+
+entries:
+  - row: 19
+    flag: missing_effect
+    covers: [missing_effect]
+    reason: >-
+      〈米沙凱的聖域〉只有名稱與難度「6（交涉）」，效果欄整格空白。
+      條目本身看起來是刻意保留的（難度已填），應是作者尚未補上敘述。

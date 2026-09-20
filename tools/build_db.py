@@ -70,12 +70,29 @@ def load_errata() -> list:
     return entries
 
 
+RECORD_BUCKETS = ("feats", "races", "affixes", "materials", "material_affixes")
+
+# 勘誤 YAML 裡寫單數的 target（讀起來比較自然），對應到內部的資料桶名稱。
+TARGET_BUCKETS = {
+    "feat": "feats",
+    "race": "races",
+    "affix": "affixes",
+    "material": "materials",
+    "material_affix": "material_affixes",
+}
+
+
 def index_records(data: dict) -> dict:
-    """建立 (工作表, 列號) -> 紀錄 的索引，供勘誤定位。"""
+    """建立 (工作表, 列號) -> [(bucket, 紀錄)] 的索引，供勘誤定位。
+
+    值是清單而不是單一紀錄：素材詞綴表的同一列同時承載了素材本身與它的
+    第一條詞綴，兩者列號相同。這種情況下勘誤必須用 target: 指明要改哪一個。
+    """
     index = {}
-    for bucket in ("feats", "races", "affixes"):
+    for bucket in RECORD_BUCKETS:
         for record in data[bucket]:
-            index[(record["source_sheet"], record["source_row"])] = (bucket, record)
+            key = (record["source_sheet"], record["source_row"])
+            index.setdefault(key, []).append((bucket, record))
     return index
 
 
@@ -92,7 +109,29 @@ def apply_errata(data: dict, entries: list) -> list:
                 f"{entry['file']}：找不到 {entry['sheet']} 第 {entry['row']} 列，"
                 "勘誤可能已經過期（原表列號變動了？）。"
             )
-        _bucket, record = index[key]
+
+        candidates = index[key]
+        available = "、".join(
+            sorted({name for name, b in TARGET_BUCKETS.items()
+                    if b in {bucket for bucket, _ in candidates}})
+        )
+        target = entry.get("target")
+        if target:
+            bucket_name = TARGET_BUCKETS.get(target, target)
+            matched = [r for bucket, r in candidates if bucket == bucket_name]
+            if not matched:
+                raise SystemExit(
+                    f"{entry['file']}：第 {entry['row']} 列沒有 target={target!r} 的紀錄"
+                    f"（可用的有：{available}）。"
+                )
+            record = matched[0]
+        elif len(candidates) > 1:
+            raise SystemExit(
+                f"{entry['file']}：第 {entry['row']} 列同時對應多種紀錄（{available}），"
+                "請以 target: 指明要修正哪一個。"
+            )
+        else:
+            record = candidates[0][1]
 
         if "flag" in entry:
             rows.append(
@@ -198,14 +237,20 @@ def build(out_path: Path, raw_dir: Path) -> dict:
 
     connection.executemany(
         """INSERT INTO feat (id, name, feat_group, difficulty, difficulty_raw,
-                             parent_id, effect, source_sheet, source_row)
+                             difficulty_scale, parent_id, effect,
+                             source_sheet, source_row)
            VALUES (:id, :name, :feat_group, :difficulty, :difficulty_raw,
-                   :parent_id, :effect, :source_sheet, :source_row)""",
+                   :difficulty_scale, :parent_id, :effect,
+                   :source_sheet, :source_row)""",
         data["feats"],
     )
     connection.executemany(
         "INSERT INTO feat_category (feat_id, category) VALUES (?, ?)",
         [(f["id"], c) for f in data["feats"] for c in f["categories"]],
+    )
+    connection.executemany(
+        "INSERT INTO feat_tag (feat_id, tag) VALUES (?, ?)",
+        [(f["id"], t) for f in data["feats"] for t in f["tags"]],
     )
     connection.executemany(
         """INSERT INTO feat_prereq (feat_id, seq, kind, ref_feat_id, ref_code,
@@ -256,6 +301,32 @@ def build(out_path: Path, raw_dir: Path) -> dict:
     )
 
     connection.executemany(
+        """INSERT INTO material (id, name, material_tier, cost_multiplier,
+                                 source_sheet, source_row)
+           VALUES (:id, :name, :material_tier, :cost_multiplier,
+                   :source_sheet, :source_row)""",
+        data["materials"],
+    )
+    connection.executemany(
+        "INSERT INTO material_slot (material_id, slot) VALUES (?, ?)",
+        [(m["id"], s) for m in data["materials"] for s in m["slots"]],
+    )
+    connection.executemany(
+        """INSERT INTO material_affix (id, material_id, name, tier_rank,
+                                       rarity_multiplier, roll_min, roll_max,
+                                       effect, source_sheet, source_row)
+           VALUES (:id, :material_id, :name, :tier_rank,
+                   :rarity_multiplier, :roll_min, :roll_max,
+                   :effect, :source_sheet, :source_row)""",
+        data["material_affixes"],
+    )
+    connection.executemany(
+        """INSERT INTO rule_text (sheet, source_row, source_col, body)
+           VALUES (:sheet, :source_row, :source_col, :body)""",
+        data["rule_texts"],
+    )
+
+    connection.executemany(
         """INSERT INTO errata (sheet, source_row, field, action, raw_value,
                                fixed_value, issue, reason)
            VALUES (:sheet, :source_row, :field, :action, :raw_value,
@@ -286,6 +357,9 @@ def build(out_path: Path, raw_dir: Path) -> dict:
         "feats": len(data["feats"]),
         "races": len(data["races"]),
         "affixes": len(data["affixes"]),
+        "materials": len(data["materials"]),
+        "material_affixes": len(data["material_affixes"]),
+        "rule_texts": len(data["rule_texts"]),
         "errata": len(errata_rows),
         "manual_errata": len(errata_entries),
     }
@@ -302,7 +376,9 @@ def main(argv=None) -> int:
 
     print(f"已建置：{out_path}")
     print(
-        f"  專長 {stats['feats']}、種族 {stats['races']}、詞綴 {stats['affixes']}"
+        f"  專長 {stats['feats']}、種族 {stats['races']}、詞綴 {stats['affixes']}、"
+        f"素材 {stats['materials']}（素材詞綴 {stats['material_affixes']}）、"
+        f"規則段落 {stats['rule_texts']}"
     )
     print(
         f"  勘誤紀錄 {stats['errata']} 筆（其中人工勘誤 {stats['manual_errata']} 筆）"

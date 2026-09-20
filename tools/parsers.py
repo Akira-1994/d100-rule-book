@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""D100 規則書 — Phase 2 Tier A 解析器。
+"""D100 規則書 — Phase 2 Tier A／B 解析器。
 
-Tier A 指經稽核後欄位完全整齊的八張工作表。這裡把它們從「一格一格的
-字串」轉成結構化紀錄，但維持一條底線：**解析不出來就留 NULL 並記一筆
-issue，絕不臆測內容**。原始字串一律保留。
+涵蓋十一張工作表：
+  Tier A（欄位完全整齊）基本／一般／高級／超魔專長、種族、
+          一般／高階／永恆聖器詞綴
+  Tier B（有前言區塊、合併欄位或父子結構）製作專長、傳奇專長、素材詞綴
+
+把它們從「一格一格的字串」轉成結構化紀錄，但維持一條底線：
+**解析不出來就留 NULL 並記一筆 issue，絕不臆測內容**。原始字串一律保留。
 
 每個解析器回傳 (records, issues)，issues 是 (row, code, detail) 三元組，
 由 build_db.py 收集後寫進資料庫的 errata 表並交給 validate.py 檢查。
@@ -17,6 +21,7 @@ import re
 from rawio import (
     cell,
     clean_name,
+    to_halfwidth,
     parse_attr_modifiers,
     parse_categories,
     parse_int,
@@ -26,12 +31,38 @@ from rawio import (
     read_sheet,
 )
 
-# 工作表 -> (feat_group, 表頭列索引 0-based, 是否有前置欄)
+# 專長類工作表的版面設定。
+#   header       表頭列索引（0-based），之前的列都是前言，進 rule_text
+#   cat/diff/prereq/effect  各欄的索引，None 代表這張表沒有這一欄
+#   combined     難度欄同時寫了難度與分類，例如傳奇專長的「6（戰鬥）」
+#   star_tag     名稱尾端的 ** 代表可由「賢者之觸」詞墜提升等級（製作專長）
 FEAT_SHEETS = {
-    "基本專長": ("basic", 2, False),
-    "一般專長": ("general", 0, True),
-    "高級專長": ("advanced", 0, True),
-    "超魔專長": ("metamagic", 2, False),
+    "基本專長": {
+        "group": "basic", "header": 2,
+        "cat": 1, "diff": 2, "prereq": None, "effect": 3,
+    },
+    "一般專長": {
+        "group": "general", "header": 0,
+        "cat": 1, "diff": 2, "prereq": 3, "effect": 4,
+    },
+    "高級專長": {
+        "group": "advanced", "header": 0,
+        "cat": 1, "diff": 2, "prereq": 3, "effect": 4,
+    },
+    "超魔專長": {
+        "group": "metamagic", "header": 2,
+        "cat": 1, "diff": 2, "prereq": None, "effect": 3,
+    },
+    "製作專長": {
+        "group": "crafting", "header": 2,
+        "cat": 1, "diff": 2, "prereq": 3, "effect": 4,
+        "star_tag": "賢者之觸可提升等級",
+    },
+    "傳奇專長": {
+        "group": "legendary", "header": 1,
+        "cat": None, "diff": 1, "prereq": None, "effect": 2,
+        "combined": True,
+    },
 }
 
 AFFIX_SHEETS = {
@@ -50,13 +81,32 @@ def feat_id(group: str, name: str) -> str:
     return f"feat:{group}:{name}"
 
 
+# 傳奇專長的難度欄把難度與分類寫在一起：「6（戰鬥）」「傳1（知識）」
+# 「難度6(操作)」。其中「傳N」是傳奇技能點而非 CP 難度 —— 依該表前言，
+# 一點傳奇技能點需消耗 10 點 CP 兌換，是另一套計價單位。
+_COMBINED_DIFFICULTY = re.compile(r"^(?:難度)?\s*(傳)?\s*(\d+)\s*\((.+)\)\s*$")
+
+
+def parse_combined_difficulty(text: str):
+    """拆解「6（戰鬥）」這類把難度與分類寫在同一格的欄位。
+
+    回傳 (difficulty, scale, categories, unknown)；解析失敗時 difficulty 為 None。
+    """
+    match = _COMBINED_DIFFICULTY.match(to_halfwidth(text).strip())
+    if not match:
+        return None, "cp", [], []
+    scale = "legend" if match.group(1) else "cp"
+    categories, unknown = parse_categories(match.group(3))
+    return float(match.group(2)), scale, categories, unknown
+
+
 def parse_feat_sheet(sheet: str, raw_dir=None):
     """解析一張專長表。"""
-    group, header_row, has_prereq = FEAT_SHEETS[sheet]
+    config = FEAT_SHEETS[sheet]
+    group = config["group"]
+    header_row = config["header"]
     rows = read_sheet(sheet, raw_dir)
     records, issues = [], []
-
-    effect_col = 4 if has_prereq else 3
 
     for index in range(header_row + 1, len(rows)):
         source_row = index + 1  # 對齊 Excel 的 1-based 列號
@@ -65,15 +115,31 @@ def parse_feat_sheet(sheet: str, raw_dir=None):
             continue
 
         name = clean_name(name_raw)
-        difficulty_raw = cell(rows, index, 2).strip()
-        difficulty = parse_number(difficulty_raw)
-        if difficulty_raw and difficulty is None:
-            issues.append(
-                (source_row, "difficulty_not_numeric", f"難度欄為 {difficulty_raw!r}")
-            )
+        tags = []
+        if config.get("star_tag") and name.endswith("**"):
+            name = name[:-2].strip()
+            tags.append(config["star_tag"])
 
-        category_raw = cell(rows, index, 1)
-        categories, unknown = parse_categories(category_raw)
+        difficulty_raw = cell(rows, index, config["diff"]).strip()
+        scale = "cp"
+
+        if config.get("combined"):
+            difficulty, scale, categories, unknown = parse_combined_difficulty(
+                difficulty_raw
+            )
+            if difficulty_raw and difficulty is None:
+                issues.append(
+                    (source_row, "difficulty_not_numeric",
+                     f"難度欄 {difficulty_raw!r} 無法拆出難度與分類")
+                )
+        else:
+            difficulty = parse_number(difficulty_raw)
+            if difficulty_raw and difficulty is None:
+                issues.append(
+                    (source_row, "difficulty_not_numeric", f"難度欄為 {difficulty_raw!r}")
+                )
+            categories, unknown = parse_categories(cell(rows, index, config["cat"]))
+
         if unknown:
             issues.append(
                 (source_row, "category_unrecognized", f"無法辨識的分類：{unknown}")
@@ -83,11 +149,12 @@ def parse_feat_sheet(sheet: str, raw_dir=None):
         if not difficulty_raw:
             issues.append((source_row, "missing_difficulty", "難度欄為空"))
 
-        effect = cell(rows, index, effect_col).strip()
+        effect = cell(rows, index, config["effect"]).strip()
         if not effect:
             issues.append((source_row, "missing_effect", "效果欄為空"))
 
-        prereq_raw = cell(rows, index, 3) if has_prereq else ""
+        prereq_col = config["prereq"]
+        prereq_raw = cell(rows, index, prereq_col) if prereq_col is not None else ""
 
         records.append(
             {
@@ -96,9 +163,11 @@ def parse_feat_sheet(sheet: str, raw_dir=None):
                 "feat_group": group,
                 "difficulty": difficulty,
                 "difficulty_raw": difficulty_raw or None,
+                "difficulty_scale": scale,
                 "parent_id": None,
                 "effect": effect,
                 "categories": categories,
+                "tags": tags,
                 "prereq_raw": prereq_raw,
                 "source_sheet": sheet,
                 "source_row": source_row,
@@ -106,6 +175,29 @@ def parse_feat_sheet(sheet: str, raw_dir=None):
         )
 
     return records, issues
+
+
+def parse_preamble(sheet: str, header_row: int, raw_dir=None):
+    """把表頭之前的前言區塊收進 rule_text。
+
+    這些段落寫的是該表的通用規則（製作耗時、傳奇專長的解鎖門檻、
+    CP 計算公式等），跟條目一樣重要，不能因為它們不在表格裡就丟掉。
+    """
+    rows = read_sheet(sheet, raw_dir)
+    blocks = []
+    for index in range(header_row):
+        for col, value in enumerate(rows[index] if index < len(rows) else []):
+            text = value.strip()
+            if text:
+                blocks.append(
+                    {
+                        "sheet": sheet,
+                        "source_row": index + 1,
+                        "source_col": col + 1,
+                        "body": text,
+                    }
+                )
+    return blocks
 
 
 _LEVEL_SUFFIX = re.compile(r"^(?P<name>.+?)\s*(?P<num>[0-9]+|[一二三四五六七八九十])\s*級$")
@@ -353,6 +445,110 @@ def parse_affix_sheet(sheet: str, raw_dir=None):
     return records, issues
 
 
+_ROLL_RANGE = re.compile(r"^(\d+)\s*(?:[~-]\s*(\d+))?$")
+
+
+def parse_roll_range(text: str):
+    """解析素材詞綴的機率欄：'1~70' 或單一的 '100'。"""
+    match = _ROLL_RANGE.match(to_halfwidth(text).strip())
+    if not match:
+        return None
+    low = int(match.group(1))
+    high = int(match.group(2)) if match.group(2) else low
+    return (low, high) if low <= high else None
+
+
+def parse_materials(raw_dir=None):
+    """解析素材詞綴。
+
+    版面是父子結構：一列素材（素材／部位／階級／加工費用倍率）後面跟著
+    數列詞綴（詞綴／稀有倍率／機率／效果），子列的前四欄因為合併儲存格
+    而留空。
+
+    另有一個變化：精金與密銀的同一個機率階有兩條詞綴 —— 一條給武器、
+    一條給主要裝備與盾牌。後者的稀有倍率與機率欄留空，代表沿用上一列的
+    階級，而不是它自己沒有機率。
+    """
+    sheet = "素材詞綴"
+    rows = read_sheet(sheet, raw_dir)
+    materials, affixes, issues = [], [], []
+
+    current = None
+    last_tier = None
+
+    for index in range(1, len(rows)):
+        source_row = index + 1
+        material_name = clean_name(cell(rows, index, 0))
+        affix_name = clean_name(cell(rows, index, 4))
+
+        if material_name:
+            tier = parse_int(cell(rows, index, 2))
+            multiplier = parse_number(cell(rows, index, 3))
+            if tier is None:
+                issues.append((source_row, "missing_material_tier", "素材階級欄無法解析"))
+            if multiplier is None:
+                issues.append(
+                    (source_row, "missing_cost_multiplier", "加工費用倍率欄無法解析")
+                )
+            current = {
+                "id": f"material:{material_name}",
+                "name": material_name,
+                "material_tier": tier,
+                "cost_multiplier": multiplier,
+                "slots": parse_slots(cell(rows, index, 1)),
+                "source_sheet": sheet,
+                "source_row": source_row,
+            }
+            if not current["slots"]:
+                issues.append((source_row, "missing_slot", "部位欄為空或無法解析"))
+            materials.append(current)
+            last_tier = None
+
+        if not affix_name:
+            continue
+        if current is None:
+            issues.append((source_row, "orphan_affix", f"詞綴「{affix_name}」沒有對應的素材"))
+            continue
+
+        rarity = parse_number(cell(rows, index, 5))
+        rolls = parse_roll_range(cell(rows, index, 6))
+
+        if rolls is None:
+            # 機率留空代表沿用上一列的階級（同階的另一種裝備適用詞綴）。
+            if last_tier is None:
+                issues.append(
+                    (source_row, "unresolved_roll_range",
+                     f"詞綴「{affix_name}」的機率欄為空，且前面沒有可沿用的階級")
+                )
+                continue
+            rolls, rarity = last_tier["rolls"], last_tier["rarity"]
+            tier_rank = last_tier["rank"]
+        else:
+            tier_rank = (last_tier["rank"] + 1) if last_tier else 1
+            last_tier = {"rolls": rolls, "rarity": rarity, "rank": tier_rank}
+
+        effect = cell(rows, index, 7).strip()
+        if not effect:
+            issues.append((source_row, "missing_effect", f"詞綴「{affix_name}」效果欄為空"))
+
+        affixes.append(
+            {
+                "id": f"material_affix:{current['name']}:{affix_name}",
+                "material_id": current["id"],
+                "name": affix_name,
+                "tier_rank": tier_rank,
+                "rarity_multiplier": rarity,
+                "roll_min": rolls[0],
+                "roll_max": rolls[1],
+                "effect": effect,
+                "source_sheet": sheet,
+                "source_row": source_row,
+            }
+        )
+
+    return materials, affixes, issues
+
+
 def parse_all(raw_dir=None):
     """跑完 Tier A 的全部解析，回傳 (資料, issues)。
 
@@ -360,22 +556,34 @@ def parse_all(raw_dir=None):
     完畢、而且所有專長都認識了之後才解析得動，因此由呼叫端在套用勘誤後
     自行呼叫 resolve_prereqs()。
     """
-    feats, affixes, issues = [], [], []
+    feats, affixes, issues, rule_texts = [], [], [], []
 
-    for sheet in FEAT_SHEETS:
+    for sheet, config in FEAT_SHEETS.items():
         records, sheet_issues = parse_feat_sheet(sheet, raw_dir)
         feats.extend(records)
         issues.extend((sheet,) + i for i in sheet_issues)
+        rule_texts.extend(parse_preamble(sheet, config["header"], raw_dir))
 
     races, race_issues = parse_races(raw_dir)
     issues.extend(("種族與其調整",) + i for i in race_issues)
 
-    for sheet in AFFIX_SHEETS:
+    for sheet, (_tier, header_row, _has_cost) in AFFIX_SHEETS.items():
         records, sheet_issues = parse_affix_sheet(sheet, raw_dir)
         affixes.extend(records)
         issues.extend((sheet,) + i for i in sheet_issues)
+        rule_texts.extend(parse_preamble(sheet, header_row, raw_dir))
 
-    return {"feats": feats, "races": races, "affixes": affixes}, issues
+    materials, material_affixes, material_issues = parse_materials(raw_dir)
+    issues.extend(("素材詞綴",) + i for i in material_issues)
+
+    return {
+        "feats": feats,
+        "races": races,
+        "affixes": affixes,
+        "materials": materials,
+        "material_affixes": material_affixes,
+        "rule_texts": rule_texts,
+    }, issues
 
 
 def resolve_prereqs(data: dict):

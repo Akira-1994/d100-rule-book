@@ -4,7 +4,7 @@
 
 完整的四階段開發計劃見 [docs/PLAN.md](docs/PLAN.md)。
 
-目前進度：**Phase 2 — SQLite 規則資料庫（Tier A 完成）**
+目前進度：**Phase 2 — SQLite 規則資料庫（Tier A／B 完成，剩 Tier C）**
 
 ## 環境準備
 
@@ -75,6 +75,11 @@ entries:
   - row: 11
     flag: incomplete_entry      # 不確定正確答案時只標記，不臆測
     covers: [missing_effect]    # 宣告已涵蓋哪些自動偵測的問題
+    reason: ...
+  - row: 14
+    target: material_affix      # 同一列對應多種紀錄時指明要改哪一個
+    set:
+      roll_max: 70
     reason: ...
 ```
 

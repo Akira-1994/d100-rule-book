@@ -95,21 +95,39 @@
 
 排程依 Tier 進行：Tier A → Tier B → Tier C（Tier C 採半自動：程式切區塊，人工在 YAML 覆蓋檔校正）。
 
+**進度**
+
+- [x] Tier A（8 張）：基本／一般／高級／超魔專長、種族、一般／高階／永恆聖器詞綴
+- [x] Tier B（3 張）：製作專長、傳奇專長、素材詞綴
+- [ ] Tier C（20 張）：9 張職業／流派表、物品價格表、詞墜分類、狩獵任務、散文規則
+
+Tier B 實際遇到的三種結構（都比預期單純）：
+
+1. **製作專長** — 前言 2 列 + 表頭在第 3 列，其餘 52 列欄位整齊。
+   名稱尾端的 `**` 代表「可由賢者之觸詞墜提升等級」，已抽成 `feat_tag`
+2. **傳奇專長** — 難度欄把難度與分類寫在同一格（`6（戰鬥）`、`傳1（知識）`、
+   `難度6(操作)`、全形的 `６（交涉）`）。其中 `傳N` 是**傳奇技能點**而非 CP 難度，
+   依該表前言一點需以 10 點 CP 兌換，故新增 `feat.difficulty_scale` 區分兩套計價
+3. **素材詞綴** — 父子結構：素材列後跟著數列詞綴，子列前四欄因合併儲存格留空。
+   另有一個變化：精金與密銀的同一機率階有兩條詞綴（一條給武器、一條給主要裝備
+   與盾牌），後者機率欄留空代表沿用上一列的階級
+
 **Schema 草案**
 
+實作見 [db/schema.sql](../db/schema.sql)。已建立的表：
+
 ```
-feat(id, name, source_sheet, category, difficulty, effect_md, max_level, notes)
-feat_prereq(feat_id, kind, ref_feat_id, min_level, raw_text)   -- kind: feat|caster_ring|bloodline|attr|free
-feat_category(feat_id, category_code)                          -- 拆解「戰鬥/運動」多分類
-race(id, name, cp_cost, special_md)
-race_modifier(race_id, target_type, target, delta)
-class_path(id, class, kind, name, desc_md)                     -- 學派/血脈/領域/結社 統一模型
-affix(id, name, tier, slots, plus_cost, effect_md)
-item_slot / item_price / material_affix / hunt_table
-rule_text(id, sheet, section, order, body_md)                  -- 散文規則原樣保存
-errata(id, table, row_ref, field, raw_value, fixed_value, reason, decided_by, decided_at)
-schema_version / import_run(xlsx_hash, at, tool_version)
+feat / feat_category / feat_tag / feat_prereq
+race / race_attr_modifier
+affix / affix_slot / affix_rank
+material / material_slot / material_affix
+rule_text          -- 表頭之前的前言段落
+errata             -- 所有修正與標記，連同理由
+category / attribute / build_info
 ```
+
+尚待 Tier C 建立：`class_path`（學派／血脈／領域／結社統一模型）、
+`item_price`、`hunt_table`。
 
 - [ ] `tools/build_db.py`：raw + `data/errata/*.yaml` → `dist/d100.db`
 - [ ] `tools/validate.py`：前置專長存在性、難度為正數、分類白名單、詞綴部位白名單、CP 公式抽查；失敗即中斷建置
