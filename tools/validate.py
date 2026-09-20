@@ -1,0 +1,316 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""D100 規則書 — 資料庫驗證器。
+
+在 build_db.py 之後跑。分兩種結果：
+  ERROR — 資料庫本身壞了（外鍵、重複主鍵、分類不在白名單），建置不該出貨
+  WARN  — 原始資料有問題但我們刻意不擋（缺效果、難度非數值、部位沒見過）
+
+另外以「法師範例」那張實際角色卡回歸驗證 rules.py 的公式，
+確保我們對規則的理解沒有跑掉。
+
+用法
+----
+    python tools/validate.py
+    python tools/validate.py --strict     # 把 WARN 也當成失敗
+"""
+
+from __future__ import annotations
+
+import argparse
+import sqlite3
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import rules  # noqa: E402
+from rawio import ATTRIBUTES, CATEGORIES, cell, read_sheet  # noqa: E402
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_DB = REPO_ROOT / "dist" / "d100.db"
+
+# 目前資料中出現過的裝備部位。新增值會觸發警告，強迫我們看一眼是不是錯字。
+KNOWN_SLOTS = {
+    "武器", "魔導槍械", "項鍊", "法杖", "鎧甲", "戒指", "頭環", "手環",
+    "披風", "盾牌", "手套", "鞋子", "腰帶", "主要裝備", "武器(弓)", "全",
+}
+
+
+class Report:
+    def __init__(self):
+        self.errors = []
+        self.warnings = []
+        self.checks = 0
+
+    def check(self, ok: bool, message: str, fatal: bool = True):
+        self.checks += 1
+        if ok:
+            return
+        (self.errors if fatal else self.warnings).append(message)
+
+    def error(self, message: str):
+        self.errors.append(message)
+
+    def warn(self, message: str):
+        self.warnings.append(message)
+
+
+def validate_schema(connection, report: Report):
+    violations = connection.execute("PRAGMA foreign_key_check").fetchall()
+    report.check(not violations, f"外鍵違規 {len(violations)} 筆：{violations[:3]}")
+
+    integrity = connection.execute("PRAGMA integrity_check").fetchone()[0]
+    report.check(integrity == "ok", f"資料庫完整性檢查失敗：{integrity}")
+
+
+def validate_feats(connection, report: Report):
+    rows = connection.execute(
+        "SELECT id, name, feat_group, difficulty, difficulty_raw, source_sheet, source_row"
+        " FROM feat"
+    ).fetchall()
+    report.check(bool(rows), "feat 表是空的")
+
+    seen = {}
+    for feat_id, name, group, difficulty, difficulty_raw, sheet, row in rows:
+        key = (group, name)
+        if key in seen:
+            report.error(
+                f"專長重複：{group} 的「{name}」同時出現在 {sheet} 第 {seen[key]} 列與第 {row} 列"
+            )
+        seen[key] = row
+
+        if difficulty is not None and difficulty <= 0:
+            report.error(f"{sheet} 第 {row} 列「{name}」難度為 {difficulty}，應為正數")
+        if difficulty is None and difficulty_raw:
+            report.warn(
+                f"{sheet} 第 {row} 列「{name}」難度 {difficulty_raw!r} 非數值，無法計算 CP"
+            )
+
+    # 每個專長都應該至少有一個分類，否則角色卡無從歸類
+    orphans = connection.execute(
+        "SELECT f.source_sheet, f.source_row, f.name FROM feat f"
+        " WHERE NOT EXISTS (SELECT 1 FROM feat_category c WHERE c.feat_id = f.id)"
+    ).fetchall()
+    for sheet, row, name in orphans:
+        report.warn(f"{sheet} 第 {row} 列「{name}」沒有任何分類")
+
+    unknown = connection.execute(
+        "SELECT DISTINCT category FROM feat_category"
+        " WHERE category NOT IN (SELECT code FROM category)"
+    ).fetchall()
+    report.check(not unknown, f"出現不在白名單的分類：{[u[0] for u in unknown]}")
+
+
+def validate_prereq_graph(connection, report: Report):
+    """前置條件不能成環，否則角色永遠學不到。"""
+    edges = {}
+    names = {}
+    for feat_id, name in connection.execute("SELECT id, name FROM feat"):
+        edges[feat_id] = []
+        names[feat_id] = name
+    for feat_id, ref in connection.execute(
+        "SELECT feat_id, ref_feat_id FROM feat_prereq WHERE ref_feat_id IS NOT NULL"
+    ):
+        edges[feat_id].append(ref)
+    for feat_id, parent in connection.execute(
+        "SELECT id, parent_id FROM feat WHERE parent_id IS NOT NULL"
+    ):
+        edges[feat_id].append(parent)
+
+    WHITE, GREY, BLACK = 0, 1, 2
+    color = dict.fromkeys(edges, WHITE)
+
+    def visit(node, trail):
+        if color[node] == GREY:
+            cycle = trail[trail.index(node):] + [node]
+            report.error("前置條件成環：" + " → ".join(names[n] for n in cycle))
+            return
+        if color[node] == BLACK:
+            return
+        color[node] = GREY
+        for neighbour in edges[node]:
+            visit(neighbour, trail + [node])
+        color[node] = BLACK
+
+    for node in edges:
+        if color[node] == WHITE:
+            visit(node, [])
+
+    report.checks += 1
+
+
+def validate_affixes(connection, report: Report):
+    unknown = connection.execute(
+        "SELECT DISTINCT slot FROM affix_slot"
+    ).fetchall()
+    for (slot,) in unknown:
+        if slot not in KNOWN_SLOTS:
+            report.warn(f"出現未見過的裝備部位 {slot!r}，請確認不是錯字或新制")
+
+    for affix_id, name, sheet, row in connection.execute(
+        "SELECT a.id, a.name, a.source_sheet, a.source_row FROM affix a"
+        " WHERE NOT EXISTS (SELECT 1 FROM affix_slot s WHERE s.affix_id = a.id)"
+    ):
+        report.warn(f"{sheet} 第 {row} 列詞綴「{name}」沒有任何部位")
+
+    bad = connection.execute(
+        "SELECT affix_id, rank, plus_cost FROM affix_rank WHERE plus_cost <= 0"
+    ).fetchall()
+    report.check(not bad, f"詞綴兌換加值應為正數，異常 {len(bad)} 筆：{bad[:3]}")
+
+    # 階級越高、所需加值應該越貴
+    previous = {}
+    for affix_id, rank, cost, condition in connection.execute(
+        "SELECT affix_id, rank, plus_cost, condition FROM affix_rank"
+        " ORDER BY affix_id, condition, rank"
+    ):
+        key = (affix_id, condition)
+        if key in previous and cost <= previous[key]:
+            name = connection.execute(
+                "SELECT name FROM affix WHERE id = ?", (affix_id,)
+            ).fetchone()[0]
+            report.warn(
+                f"詞綴「{name}」第 {rank} 階所需加值 {cost} 未高於前一階 {previous[key]}"
+            )
+        previous[key] = cost
+    report.checks += 1
+
+
+def validate_races(connection, report: Report):
+    unknown = connection.execute(
+        "SELECT DISTINCT attr FROM race_attr_modifier"
+        " WHERE attr NOT IN (SELECT code FROM attribute)"
+    ).fetchall()
+    report.check(not unknown, f"種族屬性調整出現未知屬性：{[u[0] for u in unknown]}")
+
+    for name, cp_raw, sheet, row in connection.execute(
+        "SELECT name, cp_raw, source_sheet, source_row FROM race WHERE cp_cost IS NULL"
+    ):
+        report.warn(f"{sheet} 第 {row} 列種族「{name}」的 CP 調整 {cp_raw!r} 非數值")
+
+    positive = connection.execute(
+        "SELECT name, cp_cost FROM race WHERE cp_cost > 0"
+    ).fetchall()
+    for name, cost in positive:
+        report.warn(f"種族「{name}」的 CP 調整為正數 {cost}，原表慣例是扣除（負數）")
+    report.checks += 1
+
+
+def validate_rule_formulas(report: Report):
+    """拿「法師範例」那張實際角色卡回歸驗證 rules.py。
+
+    這是唯一能確認我們對規則的理解沒跑掉的辦法 —— 規則書沒有測試，
+    但它附了一張算好的角色卡。
+    """
+    rows = read_sheet("法師範例")
+
+    scores = {}
+    for index in range(2, 11):  # C3:C11 是九大屬性
+        code = cell(rows, index, 0).strip()
+        raw = cell(rows, index, 2).strip()
+        if code in ATTRIBUTES and raw:
+            scores[code] = int(float(raw))
+
+    report.check(
+        len(scores) == 9, f"法師範例只讀到 {len(scores)} 個屬性，應為 9 個"
+    )
+    if len(scores) != 9:
+        return
+
+    # 表上的調整值（D 欄）應該和我們算的一致
+    for index in range(2, 11):
+        code = cell(rows, index, 0).strip()
+        expected = cell(rows, index, 3).strip()
+        if code in ATTRIBUTES and expected:
+            actual = rules.attribute_modifier(scores[code])
+            report.check(
+                actual == int(float(expected)),
+                f"法師範例 {code}={scores[code]} 的調整值：表上 {expected}，算出 {actual}",
+            )
+
+    # 六大技能（E/H 欄）與抗性（I/L 欄）、特殊（E/H 欄下半）
+    sheet_skills = {}
+    for index in range(1, 12):
+        label = cell(rows, index, 4).strip()
+        value = cell(rows, index, 7).strip()
+        if label and value:
+            sheet_skills[label] = value
+    for index in range(1, 7):
+        label = cell(rows, index, 8).strip()
+        value = cell(rows, index, 11).strip()
+        if label and value:
+            sheet_skills[label] = value
+
+    for label, expected_raw in sheet_skills.items():
+        try:
+            expected = int(float(expected_raw))
+        except ValueError:
+            continue
+        if label in rules.SKILL_FORMULAS or label == "知識":
+            actual = rules.skill_value(scores, label)
+        elif label in rules.RESIST_FORMULAS:
+            actual = rules.resist_value(scores, label)
+        elif label in rules.SPECIAL_FORMULAS:
+            actual = rules.special_value(scores, label)
+        else:
+            continue
+        report.check(
+            actual == expected,
+            f"法師範例「{label}」：表上 {expected}，rules.py 算出 {actual}",
+            fatal=False,
+        )
+
+    # 創角色須知的 CP 範例：難度 1 的技能學到等級 3 應為 14 點
+    report.check(
+        rules.cp_cumulative(3, 1) == 14,
+        f"CP 公式回歸失敗：難度1學到等級3應為 14，算出 {rules.cp_cumulative(3, 1)}",
+    )
+    report.check(
+        rules.cp_cumulative(3, 1) * 1 == 14 and rules.cp_for_level(5, 1) == 32,
+        "CP 公式回歸失敗：難度1的等級5單級應為 32",
+    )
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description="驗證 D100 規則書資料庫。")
+    parser.add_argument("--db", default=str(DEFAULT_DB))
+    parser.add_argument("--strict", action="store_true", help="把警告也視為失敗")
+    args = parser.parse_args(argv)
+
+    db_path = Path(args.db)
+    if not db_path.is_file():
+        raise SystemExit(f"找不到資料庫：{db_path}，請先執行 python tools/build_db.py")
+
+    connection = sqlite3.connect(db_path)
+    connection.execute("PRAGMA foreign_keys = ON")
+    report = Report()
+
+    validate_schema(connection, report)
+    validate_feats(connection, report)
+    validate_prereq_graph(connection, report)
+    validate_affixes(connection, report)
+    validate_races(connection, report)
+    validate_rule_formulas(report)
+    connection.close()
+
+    if report.errors:
+        print(f"✗ 錯誤 {len(report.errors)} 項：")
+        for message in report.errors:
+            print(f"  - {message}")
+    if report.warnings:
+        print(f"⚠ 警告 {len(report.warnings)} 項（原始資料問題，不擋建置）：")
+        for message in report.warnings:
+            print(f"  - {message}")
+    if not report.errors and not report.warnings:
+        print("✓ 全部檢查通過。")
+    elif not report.errors:
+        print(f"✓ 無錯誤（共 {report.checks} 項檢查）。")
+
+    if report.errors:
+        return 1
+    return 1 if (args.strict and report.warnings) else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

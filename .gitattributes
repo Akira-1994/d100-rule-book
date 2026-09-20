@@ -8,5 +8,11 @@
 .githooks/** -text
 *.sh         -text
 
+# 其餘純文字檔一律維持 LF，省得工具寫 LF、git 檢出 CRLF 造成無謂的 diff 反覆。
+*.py    -text
+*.yaml  -text
+*.sql   -text
+*.txt   -text
+
 # 原始試算表是二進位，不要嘗試做文字合併或 diff。
 *.xlsx  binary
