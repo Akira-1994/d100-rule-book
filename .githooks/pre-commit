@@ -1,0 +1,35 @@
+#!/bin/sh
+# D100 規則書 — 確保 data/raw 永遠與 data/source 的試算表同步。
+#
+# 只要這次 commit 動到了原始試算表或擷取工具本身，就必須重新擷取。
+# 若不強制，data/raw 會悄悄地落後於 xlsx，變更報告便不再可信。
+#
+# 安裝：git config core.hooksPath .githooks
+
+set -e
+
+staged=$(git diff --cached --name-only | grep -E '^(data/source/|tools/extract\.py$)' || true)
+if [ -z "$staged" ]; then
+    exit 0
+fi
+
+if ! command -v python >/dev/null 2>&1; then
+    echo "pre-commit：找不到 python，略過 data/raw 同步檢查。" >&2
+    exit 0
+fi
+
+if ! python -c "import openpyxl" >/dev/null 2>&1; then
+    echo "pre-commit：未安裝 openpyxl，略過 data/raw 同步檢查。" >&2
+    echo "            安裝方式：pip install -r tools/requirements.txt" >&2
+    exit 0
+fi
+
+PYTHONIOENCODING=utf-8 python tools/extract.py --check && exit 0
+
+echo "" >&2
+echo "✗ commit 已中止：data/source 或 tools/extract.py 有異動，但 data/raw 尚未同步。" >&2
+echo "  請執行：" >&2
+echo "      python tools/extract.py && git add data/raw" >&2
+echo "  並以變更報告確認這次改了什麼：" >&2
+echo "      python tools/diff_report.py" >&2
+exit 1

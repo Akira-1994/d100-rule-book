@@ -1,0 +1,12 @@
+# extract.py 一律輸出 LF。關閉 git 的換行自動轉換，
+# 否則在 Windows 上 checkout 會變成 CRLF，導致下次擷取時整份檔案出現假差異。
+*.tsv   -text
+*.json  -text
+*.md    -text
+
+# git hook 由 sh 執行，CRLF 會讓 Windows 上的 Git Bash 解析失敗。
+.githooks/** -text
+*.sh         -text
+
+# 原始試算表是二進位，不要嘗試做文字合併或 diff。
+*.xlsx  binary
