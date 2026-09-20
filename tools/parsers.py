@@ -576,7 +576,7 @@ def parse_materials(raw_dir=None):
     return materials, affixes, issues
 
 
-def parse_all(raw_dir=None):
+def parse_all(raw_dir=None, affix_aliases=None):
     """跑完 Tier A 的全部解析，回傳 (資料, issues)。
 
     注意：此時 feat 紀錄帶的是尚未解析的 prereq_raw。前置條件要等勘誤套用
@@ -628,7 +628,9 @@ def parse_all(raw_dir=None):
             invocations.extend(records)
         elif layout.get("kind") == "affix_distribution":
             records, sheet_issues = proseparser.parse_affix_distribution(
-                layout, raw_dir
+                layout,
+                {k: v["to"] for k, v in (affix_aliases or {}).items()},
+                raw_dir,
             )
             affix_distribution.extend(records)
         elif layout.get("mode") == "explicit":

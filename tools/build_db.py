@@ -48,6 +48,24 @@ AUTO_ISSUE_FIELDS = {
 }
 
 
+def load_affix_aliases() -> dict:
+    """讀入 data/errata/*.yaml 裡的詞綴名稱別名對照。
+
+    回傳 {分布表寫法: 正式名稱: 理由}。同一個寫錯的名稱在分布表裡會出現
+    很多次，逐列開勘誤不切實際，因此改用一條別名涵蓋全部。
+    """
+    if not ERRATA_DIR.is_dir():
+        return {}
+    aliases = {}
+    for path in sorted(ERRATA_DIR.glob("*.yaml")):
+        document = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        for item in document.get("affix_name_aliases", []) or []:
+            if not item.get("reason"):
+                raise SystemExit(f"{path.name}：詞綴別名 {item.get('from')!r} 缺少 reason。")
+            aliases[item["from"]] = item
+    return aliases
+
+
 def load_errata() -> list:
     """讀入 data/errata/*.yaml，回傳扁平化的勘誤項目清單。"""
     if not ERRATA_DIR.is_dir():
@@ -59,7 +77,11 @@ def load_errata() -> list:
         if not sheet:
             raise SystemExit(f"{path.name} 缺少 sheet 欄位。")
         for entry in document.get("entries", []) or []:
-            if "row" not in entry:
+            # row: all 代表整張工作表適用（例如作者裁示「術士全表分類為交涉」），
+            # 逐列寫 56 筆同樣的理由只會把清單淹掉。
+            if entry.get("row") == "all":
+                entry["row"] = None
+            elif "row" not in entry:
                 raise SystemExit(f"{path.name} 有一筆勘誤缺少 row。")
             if not entry.get("reason"):
                 raise SystemExit(
@@ -114,6 +136,36 @@ def _flag_row(entry: dict) -> dict:
     }
 
 
+def _apply_sheet_wide(data: dict, entry: dict) -> list:
+    """把一筆勘誤套用到某張工作表的所有紀錄，只記一列到 errata 表。"""
+    touched = 0
+    for bucket in RECORD_BUCKETS:
+        for record in data[bucket]:
+            if record.get("source_sheet") != entry["sheet"]:
+                continue
+            for field, value in (entry.get("set") or {}).items():
+                if field in record:
+                    record[field] = list(value) if isinstance(value, list) else value
+                    touched += 1
+    if not touched:
+        raise SystemExit(
+            f"{entry['file']}：整表勘誤沒有套用到任何紀錄，"
+            f"請確認工作表名稱 {entry['sheet']!r} 與欄位名稱是否正確。"
+        )
+    return [
+        {
+            "sheet": entry["sheet"],
+            "source_row": None,
+            "field": "、".join((entry.get("set") or {}).keys()) or None,
+            "action": "set",
+            "raw_value": None,
+            "fixed_value": json.dumps(entry.get("set"), ensure_ascii=False),
+            "issue": None,
+            "reason": f"（整表適用，共 {touched} 處）{entry['reason']}",
+        }
+    ]
+
+
 def apply_errata(data: dict, entries: list) -> list:
     """把勘誤套用到解析結果上，回傳要寫進 errata 表的列。"""
     index = index_records(data)
@@ -121,6 +173,10 @@ def apply_errata(data: dict, entries: list) -> list:
     rows = []
 
     for entry in entries:
+        if entry["row"] is None:
+            rows.extend(_apply_sheet_wide(data, entry))
+            continue
+
         key = (entry["sheet"], entry["row"])
         flag_only = "flag" in entry and not entry.get("set")
 
@@ -228,10 +284,24 @@ def normalize_records(data: dict):
 
 
 def build(out_path: Path, raw_dir: Path) -> dict:
-    data, issues = parsers.parse_all(raw_dir)
+    affix_aliases = load_affix_aliases()
+    data, issues = parsers.parse_all(raw_dir, affix_aliases)
     normalize_records(data)
     errata_entries = load_errata()
     errata_rows = apply_errata(data, errata_entries)
+    for item in affix_aliases.values():
+        errata_rows.append(
+            {
+                "sheet": "詞墜(依物品分類)",
+                "source_row": None,
+                "field": "affix_name",
+                "action": "set",
+                "raw_value": json.dumps(item["from"], ensure_ascii=False),
+                "fixed_value": json.dumps(item["to"], ensure_ascii=False),
+                "issue": None,
+                "reason": item["reason"],
+            }
+        )
     # 前置條件在勘誤之後才解析，這樣勘誤才改得動 prereq_raw。
     parsers.resolve_prereqs(data)
 

@@ -23,7 +23,14 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB = REPO_ROOT / "dist" / "d100.db"
 
+# issue 代碼以 resolved_ 開頭 = 作者已經給出結論，不再是待確認事項。
+RESOLVED_PREFIX = "resolved_"
+
 ISSUE_LABELS = {
+    "resolved_dm_ruling": "由 DM 裁定",
+    "resolved_pending_content": "保留待補內容",
+    "resolved_effect_pending": "入職門檻，效果待補",
+    "resolved_duplicate": "重複列，已去重",
     "incomplete_entry": "條目不完整",
     "unknown_prerequisite": "前置條件未定",
     "missing_effect": "缺少效果敘述",
@@ -79,8 +86,9 @@ def build_report(connection) -> str:
     out.append("")
     out.append(
         "這份清單由 `tools/errata_report.py` 自動產生。"
-        "「已修正」是我們在資料庫中替換掉的值，原始試算表並未變動；"
-        "「待確認」是我們無法判斷正確答案、只做標記的項目。"
+        "**「已修正」**是我們在資料庫中替換掉的值，原始試算表並未變動；"
+        "**「已裁示」**是規則書作者給出結論、資料庫已照辦的項目；"
+        "**「待作者確認」**是我們無法判斷正確答案、只做標記的項目。"
     )
     out.append("")
 
@@ -123,14 +131,33 @@ def build_report(connection) -> str:
         " WHERE action = 'flag' ORDER BY sheet, source_row, issue"
     ).fetchall()
 
-    # 需要作者回覆的，和純粹記錄我們做了正規化的，分開列。
-    needs_author = [f for f in flags if f[2] != "name_normalized"]
+    # 分三類：作者已裁示的、還需要作者回覆的、以及純粹記錄我們做了正規化的。
+    resolved = [f for f in flags if (f[2] or "").startswith(RESOLVED_PREFIX)]
     informational = [f for f in flags if f[2] == "name_normalized"]
+    needs_author = [
+        f for f in flags
+        if f not in resolved and f not in informational
+    ]
+
+    out.append(f"## 已裁示（{len(resolved)} 項）")
+    out.append("")
+    out.append("作者已給出結論，資料庫已照辦，列在這裡供日後回溯。")
+    out.append("")
+    if not resolved:
+        out.append("（無）")
+    else:
+        out.append("| 工作表 | 列 | 結論 | 說明 |")
+        out.append("|---|---:|---|---|")
+        for sheet, row, issue, reason in resolved:
+            label = ISSUE_LABELS.get(issue, issue)
+            text = tidy(reason).replace("|", "\\|")
+            out.append(f"| {sheet} | {row if row is not None else '整表'} | {label} | {text} |")
+    out.append("")
 
     out.append(f"## 待作者確認（{len(needs_author)} 項）")
     out.append("")
     if not needs_author:
-        out.append("（無）")
+        out.append("（無，全部項目均已裁示）")
     else:
         out.append("| 工作表 | 列 | 問題 | 說明 |")
         out.append("|---|---:|---|---|")

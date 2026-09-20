@@ -13,12 +13,13 @@ sheet: 高級專長
 
 entries:
   - row: 11
-    flag: incomplete_entry
+    flag: resolved_pending_content
     covers: [missing_effect]
     reason: >-
       〈星辰大樂章(第五幕)-〉名稱在破折號後截斷（前四幕分別是初啼、深空、
       晶壁、繁星，此列應有對應的幕名），且效果欄整格空白。
-      正確內容不明，僅標記待規則書作者補齊，不臆測。
+      作者 2026-09-20 裁示：保留此條、仍可在建卡時選擇，效果顯示為空並
+      加上「待補」標記，待日後補齊幕名與效果敘述。
 
   - row: 11
     reason: >-
@@ -28,10 +29,10 @@ entries:
       prereq_raw: "星辰大樂章(第四幕)-繁星\n神語3級\n同時具備奧術、神術\n及自然/詩歌施法能力\n(且環數不低於4環)"
 
   - row: 12
-    flag: unknown_prerequisite
+    flag: resolved_dm_ruling
     reason: >-
-      〈星辰大樂章(變奏曲)〉的前置欄原文就是「???」，顯然是作者留下的待辦。
-      需確認實際的解鎖條件。
+      〈星辰大樂章(變奏曲)〉的前置欄原文就是「???」。作者 2026-09-20 裁示：
+      保留原文不改，此條的解鎖條件一律由 DM 裁定，程式不做自動檢核。
 
   - row: 19
     reason: >-

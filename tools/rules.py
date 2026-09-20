@@ -67,9 +67,13 @@ def effective(scores: dict, attr: str) -> int:
 def skill_value(scores: dict, skill: str) -> int:
     """六大技能判定數值。"""
     if skill == "知識":
-        # 知識 =（INT＋WIS）×1.5
+        # 知識 =（INT＋WIS）×1.5，小數無條件捨去。
+        #
+        # Patch note 1.1 第 6 條的「≥0.5 進位」只適用於擲骰結果，不適用於
+        # 建卡時算好的衍生數值 —— 這是規則書作者 2026-09-20 的裁示，
+        # 與「法師範例」那張角色卡一致（(24+19)×1.5 = 64.5，卡上寫 64）。
         base = effective(scores, "INT") + effective(scores, "WIS")
-        return round_half_up(base * 1.5)
+        return int(base * 1.5)
     return sum(effective(scores, a) for a in SKILL_FORMULAS[skill])
 
 

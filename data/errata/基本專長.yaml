@@ -1,0 +1,18 @@
+sheet: 基本專長
+
+entries:
+  # 規則書作者 2026-09-20 裁示。
+  - row: 29
+    flag: resolved_dm_ruling
+    covers: [difficulty_not_numeric]
+    reason: >-
+      〈知識〉的難度欄寫 1or2，是因為這是一個「元技能」——學哪一門知識決定難度。
+      作者裁示：不列舉各門知識，由玩家與 DM 在建卡時個案裁定為 1 或 2。
+      App 應在此條提供難度選擇，而非固定值。
+
+  - row: 38
+    flag: resolved_dm_ruling
+    covers: [difficulty_not_numeric]
+    reason: >-
+      〈語言〉同上：學哪一種語言決定難度，由 DM 個案裁定 1 或 2，
+      App 應提供難度選擇。

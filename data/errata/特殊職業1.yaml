@@ -1,22 +1,30 @@
 sheet: 特殊職業1
+
 entries:
+  # 規則書作者 2026-09-20 裁示：奈瑟瑞爾奧術師的入職門檻，
+  # 三條都是真的可以學習的技能，只是效果欄沒有寫。
   - row: 3
     col: 1
-    flag: missing_effect
+    flag: resolved_effect_pending
     covers: [missing_effect]
     reason: >-
-      奈瑟瑞爾奧術師的「基本前置專長」區塊中，〈奈瑟瑞爾 奧術知識〉
-      只有分類與難度、沒有效果敘述。與 Warlock 表的情況相同，推測是在
-      宣告入職門檻而非描述技能，待作者確認。
+      〈奈瑟瑞爾 奧術知識〉是奈瑟瑞爾奧術師的入職門檻。技能實際存在且可學習，
+      原表未撰寫效果敘述，待日後補上。
+    set:
+      tags: [入職門檻]
 
   - row: 4
     col: 1
-    flag: missing_effect
+    flag: resolved_effect_pending
     covers: [missing_effect]
-    reason: 〈奧術引導〉同上：只有分類（感知）與難度（1），缺少效果敘述。
+    reason: 〈奧術引導〉同上：入職門檻，技能實際存在，效果待補。
+    set:
+      tags: [入職門檻]
 
   - row: 5
     col: 1
-    flag: missing_effect
+    flag: resolved_effect_pending
     covers: [missing_effect]
-    reason: 〈奧能掌握〉同上：只有分類（感知）與難度（1），缺少效果敘述。
+    reason: 〈奧能掌握〉同上：入職門檻，技能實際存在，效果待補。
+    set:
+      tags: [入職門檻]

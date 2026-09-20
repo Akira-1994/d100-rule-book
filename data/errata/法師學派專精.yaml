@@ -1,16 +1,14 @@
 sheet: 法師學派專精
 entries:
+  # 以下兩筆為規則書作者 2026-09-20 裁示。
   - row: 3
-    flag: missing_category
-    covers: [missing_category]
     reason: >-
-      〈學派專精〉的名稱沒有像同表其他條目那樣附上「（知識）」分類註記。
-      同表 41 個條目中有 39 個標的是知識，但這一條是所有學派的共通必備技能，
-      不逕行套用，待作者確認。
+      〈學派專精〉的名稱漏了分類註記。作者確認為知識，與同表其他 39 條一致。
+    set:
+      categories: [知識]
 
   - row: 35
-    flag: missing_category
-    covers: [missing_category]
     reason: >-
-      〈催眠凝視〉是附魔學派的第一階技能，但名稱漏了分類註記
-      （同學派的其他四條都是「（知識）」）。看起來是單純漏寫，待作者確認。
+      〈催眠凝視〉的名稱漏了分類註記。作者確認為知識，與附魔學派其他四條一致。
+    set:
+      categories: [知識]

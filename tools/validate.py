@@ -52,11 +52,38 @@ def sheets_without_category_source() -> set:
     return sheets
 
 
+def resolved_rows(connection) -> set:
+    """作者已經裁示過的列。
+
+    這些資料本身仍然不是數值（「1or2」「劇情取得」），驗證器還是得指出來，
+    但它們已經有結論了，不該和尚未處理的問題混在同一張清單上。
+    """
+    return {
+        (sheet, row)
+        for sheet, row in connection.execute(
+            "SELECT sheet, source_row FROM errata"
+            " WHERE action = 'flag' AND issue LIKE 'resolved_%'"
+        )
+    }
+
+
 class Report:
     def __init__(self):
         self.errors = []
         self.warnings = []
+        self.notes = []
         self.checks = 0
+        self.resolved = set()
+
+    def note(self, message: str):
+        self.notes.append(message)
+
+    def warn_unless_resolved(self, sheet, row, message: str):
+        """已裁示的列降級為註記，其餘照常警告。"""
+        if (sheet, row) in self.resolved:
+            self.notes.append(message)
+        else:
+            self.warnings.append(message)
 
     def check(self, ok: bool, message: str, fatal: bool = True):
         self.checks += 1
@@ -98,8 +125,10 @@ def validate_feats(connection, report: Report):
         if difficulty is not None and difficulty <= 0:
             report.error(f"{sheet} 第 {row} 列「{name}」難度為 {difficulty}，應為正數")
         if difficulty is None and difficulty_raw:
-            report.warn(
-                f"{sheet} 第 {row} 列「{name}」難度 {difficulty_raw!r} 非數值，無法計算 CP"
+            report.warn_unless_resolved(
+                sheet, row,
+                f"{sheet} 第 {row} 列「{name}」難度 {difficulty_raw!r} 非數值，"
+                "CP 成本需由 DM 裁定",
             )
 
     # 每個專長都應該至少有一個分類，否則角色卡無從歸類。
@@ -121,7 +150,7 @@ def validate_feats(connection, report: Report):
     for sheet, count in sorted(bulk.items()):
         report.warn(
             f"{sheet} 整張表沒有分類欄，{count} 個條目無法歸類"
-            "（見 docs/待確認規則.md）"
+            "（見 docs/規則裁示紀錄.md）"
         )
 
     unknown = connection.execute(
@@ -271,7 +300,11 @@ def validate_races(connection, report: Report):
     for name, cp_raw, sheet, row in connection.execute(
         "SELECT name, cp_raw, source_sheet, source_row FROM race WHERE cp_cost IS NULL"
     ):
-        report.warn(f"{sheet} 第 {row} 列種族「{name}」的 CP 調整 {cp_raw!r} 非數值")
+        report.warn_unless_resolved(
+            sheet, row,
+            f"{sheet} 第 {row} 列種族「{name}」的 CP 調整 {cp_raw!r} 非數值，"
+            "需由 DM 建卡時手填",
+        )
 
     positive = connection.execute(
         "SELECT name, cp_cost FROM race WHERE cp_cost > 0"
@@ -448,6 +481,7 @@ def main(argv=None) -> int:
     connection = sqlite3.connect(db_path)
     connection.execute("PRAGMA foreign_keys = ON")
     report = Report()
+    report.resolved = resolved_rows(connection)
 
     validate_schema(connection, report)
     validate_feats(connection, report)
@@ -467,8 +501,12 @@ def main(argv=None) -> int:
         print(f"⚠ 警告 {len(report.warnings)} 項（原始資料問題，不擋建置）：")
         for message in report.warnings:
             print(f"  - {message}")
+    if report.notes:
+        print(f"ℹ 已裁示 {len(report.notes)} 項（作者已給出結論，見 docs/勘誤清單.md）：")
+        for message in report.notes:
+            print(f"  - {message}")
     if not report.errors and not report.warnings:
-        print("✓ 全部檢查通過。")
+        print(f"✓ 無錯誤與未決問題（共 {report.checks} 項檢查）。")
     elif not report.errors:
         print(f"✓ 無錯誤（共 {report.checks} 項檢查）。")
 

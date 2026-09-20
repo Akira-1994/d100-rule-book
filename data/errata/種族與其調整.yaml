@@ -1,0 +1,11 @@
+sheet: 種族與其調整
+
+entries:
+  # 規則書作者 2026-09-20 裁示。
+  - row: 14
+    flag: resolved_dm_ruling
+    covers: [cp_not_numeric]
+    reason: >-
+      〈原初-星之幼體〉的 CP 調整欄寫「劇情取得」。作者裁示：此種族建卡時
+      「可以選擇」，但 CP 成本沒有固定值，由 DM 於建卡時手動填入。
+      App 應提供一個可編輯的 CP 欄位而非隱藏此種族。

@@ -1,38 +1,44 @@
 sheet: 特殊職業(warlock)
+
 entries:
+  # 規則書作者 2026-09-20 裁示：這一區是 Warlock 的入職門檻，
+  # 條目本身是真的可以學習的技能，只是效果欄沒有寫。
   - row: 3
     col: 1
-    flag: missing_effect
+    flag: resolved_effect_pending
     covers: [missing_effect]
     reason: >-
-      〈魔能知識〉列在「基本前置專長」下，只寫了分類（知識）與難度（3），
-      沒有任何效果敘述。推測這一區塊是在宣告「想當 Warlock 必須先點這些技能」
-      而非描述新技能，但表格本身沒有說明，待作者確認。
+      〈魔能知識〉是 Warlock 的入職門檻之一。作者確認這是實際存在、
+      可以學習的技能，只是原表沒有撰寫效果敘述，待日後補上。
+    set:
+      tags: [入職門檻]
 
   - row: 4
     col: 1
-    flag: missing_effect
+    flag: resolved_effect_pending
     covers: [missing_effect]
     reason: >-
-      〈魔能感知〉同上：只有分類（感知）與難度（2），缺少效果敘述。
+      〈魔能感知〉同上：Warlock 的入職門檻，技能實際存在，效果待補。
+    set:
+      tags: [入職門檻]
 
-  # 魔能祈喚清單（C11 區塊）
+  # 魔能祈喚清單（C11 區塊）的重複列。作者已確認是複製貼上所致。
   - row: 31
     col: 11
-    flag: duplicate_invocation
+    flag: resolved_duplicate
     covers: [duplicate_invocation]
     reason: >-
-      〈恐懼言語〉在第 30、31、32 三列完全重複（名稱、消耗、前置、效果
-      四欄逐字相同），應是複製貼上時多貼了兩次。資料庫只保留第 30 列。
+      〈恐懼言語〉在第 30、31、32 三列完全重複（四欄逐字相同）。作者確認是
+      複製貼上時多貼了兩次，資料庫只保留第 30 列。建議原表清除多餘列。
   - row: 32
     col: 11
-    flag: duplicate_invocation
+    flag: resolved_duplicate
     covers: [duplicate_invocation]
     reason: 〈恐懼言語〉重複，同第 31 列的說明。
   - row: 65
     col: 11
-    flag: duplicate_invocation
+    flag: resolved_duplicate
     covers: [duplicate_invocation]
     reason: >-
-      〈殘酷巫咒〉在第 64、65 兩列完全重複（四欄逐字相同）。
-      資料庫只保留第 64 列。
+      〈殘酷巫咒〉在第 64、65 兩列完全重複。作者確認是複製貼上所致，
+      資料庫只保留第 64 列。建議原表清除多餘列。

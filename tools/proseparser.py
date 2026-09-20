@@ -265,7 +265,7 @@ def parse_tables(layout: dict, raw_dir=None):
 _PLUS_LABEL = re.compile(r"^(?:加[一二三四五六七八九十百]+|N/A)$")
 
 
-def parse_affix_distribution(layout: dict, raw_dir=None):
+def parse_affix_distribution(layout: dict, aliases=None, raw_dir=None):
     """解析「詞墜(依物品分類)」的各部位詞綴分布。
 
     每個部位是一個區塊：一列表頭寫著「加一 加二 加三…」，每個加值等級
@@ -276,6 +276,9 @@ def parse_affix_distribution(layout: dict, raw_dir=None):
     就視為該欄從這一列起改用新的等級，而不是一條詞綴。
     """
     sheet = layout["sheet"]
+    # 同一個寫錯的名稱會在表中出現很多次（「重拳」就有 5 處），逐列開勘誤
+    # 並不實際，因此以名稱別名一次對正，對照與理由記在 data/errata。
+    aliases = aliases or {}
     rows = read_sheet(sheet, raw_dir)
     records, issues = [], []
 
@@ -319,11 +322,13 @@ def parse_affix_distribution(layout: dict, raw_dir=None):
                          f"「{value}」找不到對應的加值等級")
                     )
                     continue
+                canonical = clean_name(value)
+                canonical = aliases.get(canonical, canonical)
                 records.append(
                     {
                         "slot": slot,
                         "plus_label": label,
-                        "affix_name": clean_name(value),
+                        "affix_name": canonical,
                         "source_sheet": sheet,
                         "source_row": index + 1,
                         "source_col": col,
