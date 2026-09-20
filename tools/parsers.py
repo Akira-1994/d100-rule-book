@@ -17,8 +17,13 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
+import yaml
+
+import classparser
 from rawio import (
+    REPO_ROOT,
     cell,
     clean_name,
     to_halfwidth,
@@ -171,6 +176,7 @@ def parse_feat_sheet(sheet: str, raw_dir=None):
                 "prereq_raw": prereq_raw,
                 "source_sheet": sheet,
                 "source_row": source_row,
+                "source_col": 1,
             }
         )
 
@@ -208,6 +214,12 @@ _CASTER_RING = re.compile(
 _STAT_THRESHOLD = re.compile(
     r"^(戰鬥|運動|操作|感知|知識|交涉)數值\s*[>＞≧≥]=?\s*([0-9]+)$"
 )
+# 德魯伊的傳奇領域要求「該結社技能等級達4」——指的是所屬流派本身的等級。
+_PATH_LEVEL = re.compile(
+    r"^(?:該)?(?:結社|學派|血脈|領域|流派|宗派)?\s*技能等級達\s*([0-9]+)$"
+)
+# 前置欄偶爾會寫成「（前置法術瞬唱）」，比對前先把這個贅詞拿掉。
+_PREREQ_PREFIX = re.compile(r"^前置\s*")
 # 條件末尾的括號補述，例如「武器使用等級4（雙手武器類別）」。
 # 補述不參與比對，但完整原文仍保留在 raw_text 供顯示。
 _TRAILING_QUALIFIER = re.compile(r"[（(][^（()）]*[）)]\s*$")
@@ -282,9 +294,19 @@ def parse_prereqs(prereq_raw: str, feat_index: dict):
 
     results = []
     for part in split_prereq_lines(prereq_raw):
-        # 比對用的文字剝掉外層括號與尾端補述；raw_text 一律保留完整原文。
+        # 比對用的文字剝掉外層括號、開頭的「前置」與尾端補述；
+        # raw_text 一律保留完整原文。
         subject = _unwrap(part)
+        subject = _PREREQ_PREFIX.sub("", subject).strip() or subject
         subject = _TRAILING_QUALIFIER.sub("", subject).strip() or subject
+
+        path_level = _PATH_LEVEL.match(subject)
+        if path_level:
+            results.append(
+                {"kind": "path_level", "ref_feat_id": None, "ref_code": None,
+                 "min_level": int(path_level.group(1)), "raw_text": part}
+            )
+            continue
 
         stat = _STAT_THRESHOLD.match(subject)
         if stat:
@@ -392,6 +414,7 @@ def parse_races(raw_dir=None):
                 "attr_modifiers": modifiers,
                 "source_sheet": sheet,
                 "source_row": source_row,
+                "source_col": 1,
             }
         )
 
@@ -439,6 +462,7 @@ def parse_affix_sheet(sheet: str, raw_dir=None):
                 "ranks": ranks,
                 "source_sheet": sheet,
                 "source_row": source_row,
+                "source_col": 1,
             }
         )
 
@@ -498,6 +522,7 @@ def parse_materials(raw_dir=None):
                 "slots": parse_slots(cell(rows, index, 1)),
                 "source_sheet": sheet,
                 "source_row": source_row,
+                "source_col": 1,
             }
             if not current["slots"]:
                 issues.append((source_row, "missing_slot", "部位欄為空或無法解析"))
@@ -543,6 +568,7 @@ def parse_materials(raw_dir=None):
                 "effect": effect,
                 "source_sheet": sheet,
                 "source_row": source_row,
+                "source_col": 1,
             }
         )
 
@@ -576,8 +602,23 @@ def parse_all(raw_dir=None):
     materials, material_affixes, material_issues = parse_materials(raw_dir)
     issues.extend(("素材詞綴",) + i for i in material_issues)
 
+    # Tier C 職業表：區塊位置由 data/layout/*.yaml 宣告，程式只負責切割。
+    class_paths, class_traits = [], []
+    for layout_path in sorted((REPO_ROOT / "data" / "layout").glob("*.yaml")):
+        layout = yaml.safe_load(layout_path.read_text(encoding="utf-8"))
+        sheet_paths, sheet_feats, sheet_traits, sheet_notes, sheet_issues = (
+            classparser.parse_layout(layout, raw_dir)
+        )
+        class_paths.extend(sheet_paths)
+        class_traits.extend(sheet_traits)
+        feats.extend(sheet_feats)
+        rule_texts.extend(sheet_notes)
+        issues.extend((layout["sheet"],) + i for i in sheet_issues)
+
     return {
         "feats": feats,
+        "class_paths": class_paths,
+        "class_traits": class_traits,
         "races": races,
         "affixes": affixes,
         "materials": materials,

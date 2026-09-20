@@ -1,0 +1,10 @@
+sheet: 牧師領域
+class_name: 牧師
+path_kind: 領域
+category_source: column
+# C10 與 C19 兩個區塊的最上方都寫著「神祇領域」，那是版面橫幅而不是領域名稱
+# （真正的領域從第 3 列的「生命領域 Life Domain」開始）。收進 rule_text。
+banner_sections: [神祇領域]
+regions:
+  - blocks: [1, 10, 19]
+    columns: [name, category, difficulty, effect]

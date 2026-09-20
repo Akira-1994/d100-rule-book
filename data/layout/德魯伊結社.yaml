@@ -1,0 +1,17 @@
+sheet: 德魯伊結社
+class_name: 德魯伊
+path_kind: 結社
+category_source: column
+regions:
+  # 結社卡片。傳奇領域的列多一個前置欄（「該結社技能等級達4」），
+  # 因此同時宣告一般與加長兩種欄位順序，由填滿的欄數決定用哪一種。
+  - rows: [1, 18]
+    blocks: [1, 13]
+    columns: [name, category, difficulty, effect]
+    columns_extended: [name, category, difficulty, prereq, effect]
+  # 第 19~30 列是「地形 → 技能等級 → 額外法術」的對照表，版面完全不同，
+  # 不在此處解析（見 docs/PLAN.md 的 Tier C 第二批）。
+  - rows: [31, 40]
+    blocks: [1]
+    columns: [name, category, difficulty, effect]
+    columns_extended: [name, category, difficulty, prereq, effect]

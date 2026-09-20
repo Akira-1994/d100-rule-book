@@ -1,0 +1,10 @@
+sheet: 特殊職業(warlock)
+class_name: Warlock
+path_kind: 契約
+category_source: column
+regions:
+  # 只解析左側的契約／宗主專長區塊。
+  # 右側 C11 起是「魔能祈喚」清單，欄位是 名稱|消耗|前置|效果，
+  # 性質不同（不是可升級的技能），留待 Tier C 第二批另建資料表。
+  - blocks: [1]
+    columns: [name, category, difficulty, effect]

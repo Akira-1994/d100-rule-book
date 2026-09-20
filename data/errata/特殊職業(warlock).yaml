@@ -1,0 +1,17 @@
+sheet: 特殊職業(warlock)
+entries:
+  - row: 3
+    col: 1
+    flag: missing_effect
+    covers: [missing_effect]
+    reason: >-
+      〈魔能知識〉列在「基本前置專長」下，只寫了分類（知識）與難度（3），
+      沒有任何效果敘述。推測這一區塊是在宣告「想當 Warlock 必須先點這些技能」
+      而非描述新技能，但表格本身沒有說明，待作者確認。
+
+  - row: 4
+    col: 1
+    flag: missing_effect
+    covers: [missing_effect]
+    reason: >-
+      〈魔能感知〉同上：只有分類（感知）與難度（2），缺少效果敘述。

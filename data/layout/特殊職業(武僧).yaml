@@ -1,0 +1,11 @@
+sheet: 特殊職業(武僧)
+path_kind: 流派
+category_source: column
+class_name: 武僧
+regions:
+  - blocks:
+      - {col: 1,  class_name: 武僧}
+      - {col: 9,  class_name: 武僧}
+      # C17 是另一個職業「神掌門」，不是武僧的宗派。
+      - {col: 17, class_name: 神掌門, path_kind: 職業}
+    columns: [name, category, difficulty, effect]

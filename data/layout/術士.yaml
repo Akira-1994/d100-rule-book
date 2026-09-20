@@ -1,0 +1,8 @@
+sheet: 術士
+class_name: 術士
+path_kind: 血脈
+# 這張表的條目完全沒有分類欄，名稱也沒有括號註記。不臆測，留空。
+category_source: none
+regions:
+  - blocks: [1, 13, 25]
+    columns: [name, difficulty, effect]

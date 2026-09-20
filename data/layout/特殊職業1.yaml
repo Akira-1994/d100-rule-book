@@ -1,0 +1,12 @@
+sheet: 特殊職業1
+path_kind: 職業
+category_source: column
+# 這張表並排了三個**不同職業**（第 1 列即為職業名），各自都有「基本前置專長」
+# 「進階專長」等同名章節，因此必須逐區塊指明所屬職業。
+class_name: 特殊職業
+regions:
+  - blocks:
+      - {col: 1,  class_name: 奈瑟瑞爾奧術師}
+      - {col: 10, class_name: 賢者}
+      - {col: 18, class_name: 聖騎士（奉獻之誓）}
+    columns: [name, category, difficulty, effect]

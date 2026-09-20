@@ -1,0 +1,9 @@
+sheet: 吟遊詩人特殊專長
+class_name: 吟遊詩人
+path_kind: 學院
+category_source: column
+# C14 區塊最上方的「學院選擇」是選擇規則的說明，不是學院名稱。
+banner_sections: [學院選擇]
+regions:
+  - blocks: [1, 14]
+    columns: [name, category, difficulty, effect]

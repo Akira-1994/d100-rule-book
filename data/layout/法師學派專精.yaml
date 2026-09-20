@@ -1,0 +1,21 @@
+# 版面宣告：告訴解析器這張表的區塊長在哪裡。
+#
+# Tier C 的職業表是「排版」而非「資料」——同一張工作表上並排了好幾張
+# 卡片，沒有可靠的表頭。與其讓程式猜，不如由人看過一次、把區塊位置寫
+# 清楚，程式只負責機械地切割與擷取。
+#
+# 欄位說明
+#   class_name / path_kind  這張表描述的是哪個職業的哪一種分支
+#   regions[].rows          區間（1-based、含頭含尾），省略代表整張表
+#   regions[].blocks        每個並排區塊的起始欄（1-based）
+#   regions[].columns       區塊內的欄位順序
+#   regions[].columns_extended  某些列會多一個前置欄時的欄位順序
+#   category_source         分類從哪來：column（獨立欄）/ name（名稱括號）/ none
+
+sheet: 法師學派專精
+class_name: 法師
+path_kind: 學派
+category_source: name
+regions:
+  - blocks: [1]
+    columns: [name, difficulty, effect]

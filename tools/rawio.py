@@ -101,6 +101,11 @@ def clean_name(text: str) -> str:
     種族表有 '神魔裔\\n（潘神之子）' 與 ' 原初-星之幼體' 這類寫法，
     換行與前導空白純屬排版，不該進到識別碼或顯示名稱裡。
     """
+    # 零寬空白與 BOM 在儲存格裡看不見，卻會讓名稱比對與 id 產生失敗。
+    # 實際踩到過：「​迷惑學院」與「​劍宗」名稱前都藏著一個 U+200B。
+    for invisible in ("​", "﻿", "‎", "‏"):
+        text = text.replace(invisible, "")
+    text = text.replace(" ", " ")
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     parts = [p.strip() for p in text.split("\n") if p.strip()]
     return " ".join(parts)

@@ -32,13 +32,49 @@ CREATE TABLE attribute (
     sort_order INTEGER NOT NULL
 );
 
+-- 職業流派 --------------------------------------------------------------
+
+-- 法師學派、術士血脈、牧師領域、德魯伊結社、特殊職業的各個分支，
+-- 全部收斂成同一個模型：某個職業底下的某一條路線。
+CREATE TABLE class_path (
+    id           TEXT PRIMARY KEY,
+    class_name   TEXT NOT NULL,   -- 法師 / 術士 / 牧師 / 德魯伊 / 吟遊詩人 / …
+    path_kind    TEXT NOT NULL,   -- 學派 / 血脈 / 領域 / 結社 / 契約 / 職業
+    name         TEXT NOT NULL,   -- 防護 / 龍族血脈 / 大地結社 / …
+    description  TEXT,
+    sort_order   INTEGER NOT NULL,
+    source_sheet TEXT NOT NULL,
+    source_row   INTEGER NOT NULL,
+    -- 並排區塊會讓多個條目共用同一列號，因此欄號也是身分的一部分
+    source_col   INTEGER NOT NULL DEFAULT 1,
+    UNIQUE (source_sheet, source_row, source_col)
+);
+
+CREATE INDEX idx_class_path_class ON class_path(class_name);
+
+-- 職業的被動特性：只有名稱與敘述，沒有分類也沒有難度，因此不能用 CP 購買
+-- 也無法升級（例如武僧的「不殺」、聖騎士的「至善之魂」）。這類東西放進
+-- feat 會讓建卡介面誤以為可以花 CP 學，所以獨立成表。
+CREATE TABLE class_trait (
+    id            TEXT PRIMARY KEY,
+    class_path_id TEXT REFERENCES class_path(id) ON DELETE CASCADE,
+    name          TEXT NOT NULL,
+    description   TEXT NOT NULL,
+    source_sheet  TEXT NOT NULL,
+    source_row    INTEGER NOT NULL,
+    source_col    INTEGER NOT NULL DEFAULT 1,
+    UNIQUE (source_sheet, source_row, source_col)
+);
+
 -- 專長 ------------------------------------------------------------------
 
 CREATE TABLE feat (
     id             TEXT PRIMARY KEY,
     name           TEXT NOT NULL,
-    -- basic / general / advanced / metamagic / crafting / legendary
+    -- basic / general / advanced / metamagic / crafting / legendary / class
     feat_group     TEXT NOT NULL,
+    -- feat_group = 'class' 時指向所屬的職業流派
+    class_path_id  TEXT REFERENCES class_path(id),
     difficulty     REAL,            -- 非固定難度時為 NULL
     difficulty_raw TEXT,            -- 原始字串，例如 '1or2'、'傳1（知識）'
     -- 難度的計價單位。'cp' 走 2^等級×難度 的一般公式；
@@ -48,7 +84,8 @@ CREATE TABLE feat (
     effect         TEXT NOT NULL,
     source_sheet   TEXT NOT NULL,
     source_row     INTEGER NOT NULL,
-    UNIQUE (source_sheet, source_row)
+    source_col     INTEGER NOT NULL DEFAULT 1,
+    UNIQUE (source_sheet, source_row, source_col)
 );
 
 -- 條目上的附註標記，例如製作專長名稱尾端的 ** 代表可由「賢者之觸」

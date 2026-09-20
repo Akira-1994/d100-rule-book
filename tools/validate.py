@@ -24,6 +24,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import yaml  # noqa: E402
+
 import rules  # noqa: E402
 from rawio import ATTRIBUTES, CATEGORIES, cell, read_sheet  # noqa: E402
 
@@ -35,6 +37,19 @@ KNOWN_SLOTS = {
     "武器", "魔導槍械", "項鍊", "法杖", "鎧甲", "戒指", "頭環", "手環",
     "披風", "盾牌", "手套", "鞋子", "腰帶", "主要裝備", "武器(弓)", "全",
 }
+
+
+def sheets_without_category_source() -> set:
+    """讀版面宣告，找出整張都沒有分類來源的工作表。"""
+    layout_dir = REPO_ROOT / "data" / "layout"
+    if not layout_dir.is_dir():
+        return set()
+    sheets = set()
+    for path in sorted(layout_dir.glob("*.yaml")):
+        layout = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        if layout.get("category_source") == "none":
+            sheets.add(layout["sheet"])
+    return sheets
 
 
 class Report:
@@ -87,13 +102,27 @@ def validate_feats(connection, report: Report):
                 f"{sheet} 第 {row} 列「{name}」難度 {difficulty_raw!r} 非數值，無法計算 CP"
             )
 
-    # 每個專長都應該至少有一個分類，否則角色卡無從歸類
+    # 每個專長都應該至少有一個分類，否則角色卡無從歸類。
+    # 但有些工作表整張都沒有分類欄（術士），那是規則書本身的缺口而不是
+    # 逐列的錯誤，逐條列出只會把真正的問題淹掉，改成一條彙總警告。
+    no_category_sheets = sheets_without_category_source()
     orphans = connection.execute(
         "SELECT f.source_sheet, f.source_row, f.name FROM feat f"
         " WHERE NOT EXISTS (SELECT 1 FROM feat_category c WHERE c.feat_id = f.id)"
+        " ORDER BY f.source_sheet, f.source_row"
     ).fetchall()
+
+    bulk = {}
     for sheet, row, name in orphans:
-        report.warn(f"{sheet} 第 {row} 列「{name}」沒有任何分類")
+        if sheet in no_category_sheets:
+            bulk[sheet] = bulk.get(sheet, 0) + 1
+        else:
+            report.warn(f"{sheet} 第 {row} 列「{name}」沒有任何分類")
+    for sheet, count in sorted(bulk.items()):
+        report.warn(
+            f"{sheet} 整張表沒有分類欄，{count} 個條目無法歸類"
+            "（見 docs/待確認規則.md）"
+        )
 
     unknown = connection.execute(
         "SELECT DISTINCT category FROM feat_category"

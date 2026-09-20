@@ -70,7 +70,8 @@ def load_errata() -> list:
     return entries
 
 
-RECORD_BUCKETS = ("feats", "races", "affixes", "materials", "material_affixes")
+RECORD_BUCKETS = ("feats", "races", "affixes", "materials",
+                  "material_affixes", "class_paths", "class_traits")
 
 # 勘誤 YAML 裡寫單數的 target（讀起來比較自然），對應到內部的資料桶名稱。
 TARGET_BUCKETS = {
@@ -79,6 +80,8 @@ TARGET_BUCKETS = {
     "affix": "affixes",
     "material": "materials",
     "material_affix": "material_affixes",
+    "class_path": "class_paths",
+    "class_trait": "class_traits",
 }
 
 
@@ -111,6 +114,21 @@ def apply_errata(data: dict, entries: list) -> list:
             )
 
         candidates = index[key]
+        # Tier C 的職業表並排多個區塊，同一列可能有好幾個條目，
+        # 此時勘誤要再以 col: 指明是哪一欄的那一個。
+        if "col" in entry:
+            narrowed = [
+                (bucket, record) for bucket, record in candidates
+                if record.get("source_col", 1) == entry["col"]
+            ]
+            if not narrowed:
+                columns = sorted({r.get("source_col", 1) for _b, r in candidates})
+                raise SystemExit(
+                    f"{entry['file']}：第 {entry['row']} 列沒有 col={entry['col']} 的紀錄"
+                    f"（該列有內容的欄位：{columns}）。"
+                )
+            candidates = narrowed
+
         available = "、".join(
             sorted({name for name, b in TARGET_BUCKETS.items()
                     if b in {bucket for bucket, _ in candidates}})
@@ -178,8 +196,21 @@ def apply_errata(data: dict, entries: list) -> list:
     return rows
 
 
+def normalize_records(data: dict):
+    """補齊各解析器之間不一致的選用欄位。
+
+    Tier A/B 的專長沒有職業流派、Tier C 的專長沒有標籤，兩邊都只填自己
+    關心的欄位。與其要求每個解析器都記得填滿，不如在寫入前統一補預設值。
+    """
+    for record in data["feats"]:
+        record.setdefault("class_path_id", None)
+        record.setdefault("tags", [])
+        record.setdefault("source_col", 1)
+
+
 def build(out_path: Path, raw_dir: Path) -> dict:
     data, issues = parsers.parse_all(raw_dir)
+    normalize_records(data)
     errata_entries = load_errata()
     errata_rows = apply_errata(data, errata_entries)
     # 前置條件在勘誤之後才解析，這樣勘誤才改得動 prereq_raw。
@@ -236,12 +267,26 @@ def build(out_path: Path, raw_dir: Path) -> dict:
     )
 
     connection.executemany(
-        """INSERT INTO feat (id, name, feat_group, difficulty, difficulty_raw,
-                             difficulty_scale, parent_id, effect,
-                             source_sheet, source_row)
-           VALUES (:id, :name, :feat_group, :difficulty, :difficulty_raw,
-                   :difficulty_scale, :parent_id, :effect,
-                   :source_sheet, :source_row)""",
+        """INSERT INTO class_path (id, class_name, path_kind, name, description,
+                                   sort_order, source_sheet, source_row, source_col)
+           VALUES (:id, :class_name, :path_kind, :name, :description,
+                   :sort_order, :source_sheet, :source_row, :source_col)""",
+        data["class_paths"],
+    )
+    connection.executemany(
+        """INSERT INTO class_trait (id, class_path_id, name, description,
+                                    source_sheet, source_row, source_col)
+           VALUES (:id, :class_path_id, :name, :description,
+                   :source_sheet, :source_row, :source_col)""",
+        data["class_traits"],
+    )
+    connection.executemany(
+        """INSERT INTO feat (id, name, feat_group, class_path_id, difficulty,
+                             difficulty_raw, difficulty_scale, parent_id, effect,
+                             source_sheet, source_row, source_col)
+           VALUES (:id, :name, :feat_group, :class_path_id, :difficulty,
+                   :difficulty_raw, :difficulty_scale, :parent_id, :effect,
+                   :source_sheet, :source_row, :source_col)""",
         data["feats"],
     )
     connection.executemany(
@@ -357,6 +402,8 @@ def build(out_path: Path, raw_dir: Path) -> dict:
         "feats": len(data["feats"]),
         "races": len(data["races"]),
         "affixes": len(data["affixes"]),
+        "class_paths": len(data["class_paths"]),
+        "class_traits": len(data["class_traits"]),
         "materials": len(data["materials"]),
         "material_affixes": len(data["material_affixes"]),
         "rule_texts": len(data["rule_texts"]),
@@ -376,7 +423,9 @@ def main(argv=None) -> int:
 
     print(f"已建置：{out_path}")
     print(
-        f"  專長 {stats['feats']}、種族 {stats['races']}、詞綴 {stats['affixes']}、"
+        f"  專長 {stats['feats']}（職業流派 {stats['class_paths']}、"
+        f"被動特性 {stats['class_traits']}）、"
+        f"種族 {stats['races']}、詞綴 {stats['affixes']}、"
         f"素材 {stats['materials']}（素材詞綴 {stats['material_affixes']}）、"
         f"規則段落 {stats['rule_texts']}"
     )
