@@ -104,6 +104,140 @@ export interface FeatChapter {
   uncategorized: ChapterFeat[];
 }
 
+// 種族 --------------------------------------------------------------------
+
+export interface AttrModifier {
+  attr: string;
+  delta: number;
+}
+
+export interface Race {
+  id: string;
+  name: string;
+  /** 非數值時為 null，原文保留在 cp_raw（〈原初-星之幼體〉是「劇情取得」）。 */
+  cp_cost: number | null;
+  cp_raw: string;
+  modifiers: AttrModifier[];
+  attr_text: string | null;
+  racial_feat_text: string | null;
+  skill_mod_text: string | null;
+  special_text: string | null;
+  source_sheet: string;
+  source_row: number;
+}
+
+export interface RaceChapter {
+  races: Race[];
+}
+
+// 物品 --------------------------------------------------------------------
+
+export interface AffixRank {
+  rank: number;
+  plus_cost: number;
+  /** 非空代表這是同一階在不同裝備上的價碼，不是另一個階級。 */
+  condition: string;
+}
+
+export interface Affix {
+  id: string;
+  name: string;
+  slots: string[];
+  ranks: AffixRank[];
+  plus_cost_raw: string | null;
+  effect: string;
+  source_sheet: string;
+  source_row: number;
+}
+
+export interface AffixChapter {
+  tier: string;
+  intro: string[];
+  affixes: Affix[];
+}
+
+export interface MaterialAffix {
+  id: string;
+  name: string;
+  tier_rank: number;
+  rarity_multiplier: number | null;
+  roll_min: number;
+  roll_max: number;
+  effect: string;
+  source_row: number;
+}
+
+export interface Material {
+  id: string;
+  name: string;
+  material_tier: number | null;
+  cost_multiplier: number | null;
+  slots: string[];
+  affixes: MaterialAffix[];
+  source_sheet: string;
+  source_row: number;
+}
+
+export interface MaterialChapter {
+  intro: string[];
+  materials: Material[];
+}
+
+export interface DistributionGroup {
+  slot: string;
+  plus_label: string;
+  affixes: string[];
+}
+
+// 對照表 ------------------------------------------------------------------
+
+export interface RefTable {
+  id: string;
+  sheet: string;
+  name: string;
+  note: string | null;
+  columns: string[];
+  rows: string[][];
+  source_row: number;
+}
+
+export interface RefTableSummary {
+  id: string;
+  sheet: string;
+  name: string;
+  row_count: number;
+}
+
+// 散文與勘誤 --------------------------------------------------------------
+
+export interface ProseBlock {
+  id: number;
+  subsection: string | null;
+  body: string;
+}
+
+export interface ProseSection {
+  title: string | null;
+  blocks: ProseBlock[];
+}
+
+export interface ProseChapter {
+  sheet: string;
+  sections: ProseSection[];
+  tables: RefTable[];
+}
+
+export interface ErrataEntry {
+  sheet: string;
+  source_row: number | null;
+  field: string | null;
+  action: string;
+  raw_value: string | null;
+  fixed_value: string | null;
+  issue: string | null;
+  reason: string;
+}
+
 // 展開區 ------------------------------------------------------------------
 
 /** 前置條件的種類。kind 決定這一條能不能自動驗證。 */
@@ -188,6 +322,27 @@ export const getEntryDetail = (kind: string, id: string) =>
 
 export const searchAll = (query: string) =>
   invoke<SearchHit[]>("search", { query });
+
+export const getRaceChapter = () => invoke<RaceChapter>("race_chapter");
+
+export const getAffixChapter = (tier: string) =>
+  invoke<AffixChapter>("affix_chapter", { tier });
+
+export const getMaterialChapter = () =>
+  invoke<MaterialChapter>("material_chapter");
+
+export const getAffixDistribution = () =>
+  invoke<DistributionGroup[]>("affix_distribution");
+
+export const getRefSheet = (sheet: string) =>
+  invoke<RefTable[]>("ref_sheet", { sheet });
+
+export const getRefIndex = () => invoke<RefTableSummary[]>("ref_index");
+
+export const getProseChapter = (sheet: string) =>
+  invoke<ProseChapter>("prose_chapter", { sheet });
+
+export const getErrataList = () => invoke<ErrataEntry[]>("errata_list");
 
 // 顯示用的格式化 ----------------------------------------------------------
 

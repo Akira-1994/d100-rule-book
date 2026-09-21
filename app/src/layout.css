@@ -368,6 +368,143 @@ kbd {
   font-family: var(--mono);
 }
 
+/* 種族 --------------------------------------------------------------- */
+
+.race-fields {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 12px;
+  margin: 8px 0 0;
+  font-size: 12.5px;
+}
+
+.race-fields dt {
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 11px;
+  padding-top: 2px;
+}
+
+.race-fields dd {
+  margin: 0;
+  color: var(--text2);
+  white-space: pre-wrap;
+  line-height: 1.75;
+}
+
+/* 詞綴 --------------------------------------------------------------- */
+
+.affix-ranks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+/* 對照表 ------------------------------------------------------------- */
+
+.ref-table {
+  margin: 0 0 22px;
+  max-width: 62rem;
+  scroll-margin-top: 12px;
+}
+
+.ref-table figcaption {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-family: var(--serif);
+  font-size: 15px;
+  color: var(--text);
+}
+
+.ref-note {
+  font-family: var(--sans);
+  font-size: 11.5px;
+  color: var(--text3);
+}
+
+/* 欄數多的表（價格表有幾張很寬）讓它自己捲，不要把版面撐開。 */
+.ref-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.ref-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.ref-table th,
+.ref-table td {
+  padding: 6px 11px;
+  text-align: left;
+  border-bottom: 1px solid var(--line2);
+  white-space: pre-wrap;
+}
+
+.ref-table th {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--gold);
+  background: var(--gold-soft);
+  border-bottom-color: var(--gold-line);
+}
+
+.ref-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* 散文 --------------------------------------------------------------- */
+
+.chapter-body.prose {
+  max-width: 62rem;
+}
+
+.prose-block {
+  margin-bottom: 14px;
+  scroll-margin: 80px;
+}
+
+.prose-block.flash {
+  animation: flash 1.5s ease-out;
+  border-radius: 6px;
+}
+
+/* 第二層標題往內縮，兩層層級才看得出來（戰鬥流程的大步驟底下還有子項）。 */
+.prose-sub {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: var(--text);
+  padding-left: 12px;
+  border-left: 3px solid var(--gold-line);
+}
+
+.prose-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  color: var(--text2);
+}
+
+.prose-sub + .prose-body {
+  padding-left: 15px;
+}
+
+/* 勘誤 --------------------------------------------------------------- */
+
+.errata-change {
+  margin: 7px 0 0;
+  font-size: 11.5px;
+  color: var(--text3);
+}
+
 /* 右側小目錄 --------------------------------------------------------- */
 
 .section-nav {

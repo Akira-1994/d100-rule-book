@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { BuildInfo, Toc, getBuildInfo, getToc } from "./api";
+import AppendixChapter from "./chapters/AppendixChapter";
 import ClassChapter from "./chapters/ClassChapter";
 import FeatChapter from "./chapters/FeatChapter";
+import ItemChapter from "./chapters/ItemChapter";
+import ProseChapter from "./chapters/ProseChapter";
+import RaceChapter from "./chapters/RaceChapter";
 import CommandPalette from "./components/CommandPalette";
 import ThemeToggle from "./components/ThemeToggle";
 import { Address, revealEntry, sameTab, useNavigation } from "./nav";
@@ -107,27 +111,7 @@ export default function App() {
         ))}
       </nav>
 
-      <main className="page">
-        {tab?.kind === "class" && (
-          <ClassChapter
-            key={tab.key}
-            className={tab.key}
-            onNavigate={navigate}
-            pending={address.anchor}
-          />
-        )}
-        {tab?.kind === "feats" && (
-          <FeatChapter
-            key={tab.key}
-            group={tab.key}
-            onNavigate={navigate}
-            pending={address.anchor}
-          />
-        )}
-        {tab && tab.kind !== "class" && tab.kind !== "feats" && (
-          <p className="loading">這一章於階段 2 補上。</p>
-        )}
-      </main>
+      <main className="page">{tab && renderChapter(tab, address, navigate)}</main>
 
       <footer className="statusbar">
         {info && (
@@ -145,4 +129,55 @@ export default function App() {
       />
     </div>
   );
+}
+
+/**
+ * 依頁籤的 kind 決定渲染哪個章節元件。
+ *
+ * key 用頁籤代碼，切頁時整個重建而不是沿用舊狀態 —— 否則捲動位置與展開
+ * 狀態會跟著跑到新的一頁去。
+ */
+function renderChapter(
+  tab: { key: string; kind: string },
+  address: Address,
+  navigate: (a: Address) => void,
+) {
+  switch (tab.kind) {
+    case "class":
+      return (
+        <ClassChapter
+          key={tab.key}
+          className={tab.key}
+          onNavigate={navigate}
+          pending={address.anchor}
+        />
+      );
+    case "feats":
+      return (
+        <FeatChapter
+          key={tab.key}
+          group={tab.key}
+          onNavigate={navigate}
+          pending={address.anchor}
+        />
+      );
+    case "race":
+      return <RaceChapter key={tab.key} pending={address.anchor} />;
+    case "affix":
+    case "material":
+    case "ref_sheet":
+    case "affix_distribution":
+      return (
+        <ItemChapter
+          key={tab.key}
+          kind={tab.kind}
+          tabKey={tab.key}
+          pending={address.anchor}
+        />
+      );
+    case "prose":
+      return <ProseChapter key={tab.key} sheet={tab.key} pending={address.anchor} />;
+    default:
+      return <AppendixChapter key={tab.key} kind={tab.kind} />;
+  }
 }
