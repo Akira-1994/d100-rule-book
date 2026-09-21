@@ -2,7 +2,11 @@ mod db;
 
 use std::sync::Mutex;
 
-use db::{BuildInfo, Db, Facets, FeatDetail, FeatSummary};
+use db::{
+    AffixChapter, BuildInfo, ClassChapter, Db, DistributionGroup, EntryDetail, ErrataEntry,
+    FeatChapter, MaterialChapter, ProseChapter, RaceChapter, RefTable, RefTableSummary,
+    SearchHit, Toc,
+};
 use tauri::Manager;
 
 /// 一次借出連線並執行查詢。
@@ -26,25 +30,75 @@ fn build_info(state: tauri::State<'_, Db>) -> Result<BuildInfo, String> {
 }
 
 #[tauri::command]
-fn facets(state: tauri::State<'_, Db>) -> Result<Facets, String> {
-    with_conn(&state, db::facets)
+fn toc(state: tauri::State<'_, Db>) -> Result<Toc, String> {
+    with_conn(&state, db::toc)
 }
 
 #[tauri::command]
-fn search_feats(
+fn class_chapter(
     state: tauri::State<'_, Db>,
-    query: String,
-    groups: Vec<String>,
-    categories: Vec<String>,
-) -> Result<Vec<FeatSummary>, String> {
-    with_conn(&state, |conn| {
-        db::search_feats(conn, &query, &groups, &categories, 300)
-    })
+    class_name: String,
+) -> Result<ClassChapter, String> {
+    with_conn(&state, |conn| db::class_chapter(conn, &class_name))
 }
 
 #[tauri::command]
-fn feat_detail(state: tauri::State<'_, Db>, id: String) -> Result<FeatDetail, String> {
-    with_conn(&state, |conn| db::feat_detail(conn, &id))
+fn feat_chapter(state: tauri::State<'_, Db>, group: String) -> Result<FeatChapter, String> {
+    with_conn(&state, |conn| db::feat_chapter(conn, &group))
+}
+
+#[tauri::command]
+fn race_chapter(state: tauri::State<'_, Db>) -> Result<RaceChapter, String> {
+    with_conn(&state, db::race_chapter)
+}
+
+#[tauri::command]
+fn affix_chapter(state: tauri::State<'_, Db>, tier: String) -> Result<AffixChapter, String> {
+    with_conn(&state, |conn| db::affix_chapter(conn, &tier))
+}
+
+#[tauri::command]
+fn material_chapter(state: tauri::State<'_, Db>) -> Result<MaterialChapter, String> {
+    with_conn(&state, db::material_chapter)
+}
+
+#[tauri::command]
+fn affix_distribution(state: tauri::State<'_, Db>) -> Result<Vec<DistributionGroup>, String> {
+    with_conn(&state, db::affix_distribution)
+}
+
+#[tauri::command]
+fn ref_sheet(state: tauri::State<'_, Db>, sheet: String) -> Result<Vec<RefTable>, String> {
+    with_conn(&state, |conn| db::ref_sheet(conn, &sheet))
+}
+
+#[tauri::command]
+fn ref_index(state: tauri::State<'_, Db>) -> Result<Vec<RefTableSummary>, String> {
+    with_conn(&state, db::ref_index)
+}
+
+#[tauri::command]
+fn prose_chapter(state: tauri::State<'_, Db>, sheet: String) -> Result<ProseChapter, String> {
+    with_conn(&state, |conn| db::prose_chapter(conn, &sheet))
+}
+
+#[tauri::command]
+fn errata_list(state: tauri::State<'_, Db>) -> Result<Vec<ErrataEntry>, String> {
+    with_conn(&state, db::errata_list)
+}
+
+#[tauri::command]
+fn search(state: tauri::State<'_, Db>, query: String) -> Result<Vec<SearchHit>, String> {
+    with_conn(&state, |conn| db::search(conn, &query, 60))
+}
+
+#[tauri::command]
+fn entry_detail(
+    state: tauri::State<'_, Db>,
+    kind: String,
+    id: String,
+) -> Result<EntryDetail, String> {
+    with_conn(&state, |conn| db::entry_detail(conn, &kind, &id))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -61,9 +115,19 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             build_info,
-            facets,
-            search_feats,
-            feat_detail
+            toc,
+            class_chapter,
+            feat_chapter,
+            race_chapter,
+            affix_chapter,
+            material_chapter,
+            affix_distribution,
+            ref_sheet,
+            ref_index,
+            prose_chapter,
+            errata_list,
+            search,
+            entry_detail
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

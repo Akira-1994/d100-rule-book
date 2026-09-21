@@ -1,0 +1,684 @@
+/*
+ * 版面與元件樣式。顏色一律引用 theme.css 的變數，這裡不寫死任何色碼，
+ * 亮暗兩套主題才不會各自維護一份。
+ *
+ * 檔名刻意不叫 app.css：Windows 的檔案系統不分大小寫，與舊的 App.css
+ * 會指到同一個檔案。
+ */
+
+.app {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  height: 100%;
+}
+
+/* 章節列 ------------------------------------------------------------- */
+
+.chapter-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  padding: 10px 18px 0;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--line);
+}
+
+.chapter-tab {
+  font-family: var(--serif);
+  font-size: 15px;
+  padding: 9px 16px;
+  color: var(--text3);
+  background: none;
+  border: 0;
+  border-radius: 6px 6px 0 0;
+}
+
+.chapter-tab:hover {
+  color: var(--text2);
+}
+
+.chapter-tab.on {
+  color: var(--text);
+  font-weight: 700;
+  background: var(--bg);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.bar-tail {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 6px;
+}
+
+.search-button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text3);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 10px;
+}
+
+.search-button:hover {
+  color: var(--text2);
+  border-color: var(--accent-soft);
+}
+
+kbd {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 1px 4px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--bg2);
+}
+
+.icon-button {
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+  color: var(--text3);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.icon-button:hover {
+  color: var(--accent);
+}
+
+/* 頁籤列 ------------------------------------------------------------- */
+
+.tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 9px 18px;
+  border-bottom: 1px solid var(--line2);
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  padding: 4px 11px;
+  border-radius: 99px;
+  color: var(--text3);
+  background: var(--card);
+  border: 1px solid var(--line2);
+}
+
+.tab:hover {
+  color: var(--text2);
+  border-color: var(--line);
+}
+
+.tab.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+.tab i {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 10px;
+  opacity: 0.65;
+}
+
+/* 章節版面 ----------------------------------------------------------- */
+
+.page {
+  overflow: hidden;
+}
+
+.chapter-layout {
+  display: grid;
+  grid-template-columns: 1fr 172px;
+  gap: 20px;
+  height: 100%;
+  padding: 0 18px;
+}
+
+.chapter-body {
+  overflow-y: auto;
+  padding: 16px 4px 60px 0;
+}
+
+.intro {
+  margin-bottom: 22px;
+  padding: 12px 16px;
+  border-left: 3px solid var(--gold-line);
+  background: var(--gold-soft);
+  border-radius: 0 8px 8px 0;
+}
+
+.intro p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.intro p:last-child {
+  margin-bottom: 0;
+}
+
+.path {
+  margin-bottom: 30px;
+  scroll-margin-top: 12px;
+}
+
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.path-name {
+  font-size: 22px;
+  margin: 5px 0 4px;
+  letter-spacing: 0.04em;
+}
+
+.path-desc {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  color: var(--text3);
+  white-space: pre-wrap;
+}
+
+.traits {
+  margin-top: 16px;
+}
+
+.traits-note {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--text3);
+}
+
+/* 卡片 --------------------------------------------------------------- */
+
+/*
+ * 每列一張卡。兩欄排版會因為效果敘述長短不一而高度不均，展開時又會推動
+ * 另一欄，怎麼調都不整齊 —— 單欄沒有這個問題，左緣與卡片間距完全一致。
+ *
+ * 代價是行會變長，所以用 max-width 把版心壓在約 58 個中文字。這是書的
+ * 「行長」而不是視窗寬度：滿版的中文長行掃讀時很容易串行。
+ */
+.card-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  max-width: 62rem;
+}
+
+@media (max-width: 900px) {
+  .chapter-layout {
+    grid-template-columns: 1fr;
+  }
+  .section-nav {
+    display: none;
+  }
+}
+
+.feat-card {
+  padding: 11px 13px;
+  border-radius: 8px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  scroll-margin: 80px;
+}
+
+.feat-card.open {
+  border-color: var(--accent);
+  background: var(--card-open);
+  box-shadow: 0 0 0 1px var(--accent-soft), 0 4px 16px var(--shadow);
+}
+
+.feat-card.flash {
+  animation: flash 1.5s ease-out;
+}
+
+@keyframes flash {
+  0%,
+  35% {
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+
+.feat-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: 0;
+  text-align: left;
+}
+
+.feat-head.static {
+  cursor: default;
+}
+
+.feat-name {
+  font-family: var(--serif);
+  font-size: 15px;
+  color: var(--text);
+}
+
+.badge-difficulty {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 10.5px;
+  padding: 4px 7px;
+  border-radius: 3px;
+  background: var(--gold);
+  color: var(--gold-ink);
+}
+
+.chip {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: var(--gold-soft);
+  color: var(--gold);
+  border: 1px solid var(--gold-line);
+  font-weight: 600;
+}
+
+.chip.tag {
+  background: transparent;
+  color: var(--text3);
+  border-color: var(--line);
+}
+
+.caret {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text3);
+}
+
+.feat-effect {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.78;
+  color: var(--text2);
+  white-space: pre-wrap;
+}
+
+/* 展開區 ------------------------------------------------------------- */
+
+.feat-expand {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+}
+
+.expand-label {
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  color: var(--gold);
+  margin-bottom: 5px;
+  font-weight: 700;
+}
+
+.expand-body {
+  margin: 0 0 6px;
+  font-size: 11.5px;
+  line-height: 1.75;
+}
+
+.link {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--accent);
+  border-bottom: 1px dotted var(--accent-soft);
+}
+
+.prereq-kind {
+  margin-left: 4px;
+  font-size: 9.5px;
+  color: var(--text3);
+}
+
+/* DM 裁定的前置要看得出來，免得建卡時以為程式檢查過了。 */
+.prereq-kind.free {
+  color: var(--accent);
+}
+
+.source {
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--text3);
+  font-family: var(--mono);
+}
+
+/* 種族 --------------------------------------------------------------- */
+
+.race-fields {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 12px;
+  margin: 8px 0 0;
+  font-size: 12.5px;
+}
+
+.race-fields dt {
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 11px;
+  padding-top: 2px;
+}
+
+.race-fields dd {
+  margin: 0;
+  color: var(--text2);
+  white-space: pre-wrap;
+  line-height: 1.75;
+}
+
+/* 詞綴 --------------------------------------------------------------- */
+
+.affix-ranks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+/* 對照表 ------------------------------------------------------------- */
+
+.ref-table {
+  margin: 0 0 22px;
+  max-width: 62rem;
+  scroll-margin-top: 12px;
+}
+
+.ref-table figcaption {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-family: var(--serif);
+  font-size: 15px;
+  color: var(--text);
+}
+
+.ref-note {
+  font-family: var(--sans);
+  font-size: 11.5px;
+  color: var(--text3);
+}
+
+/* 欄數多的表（價格表有幾張很寬）讓它自己捲，不要把版面撐開。 */
+.ref-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.ref-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.ref-table th,
+.ref-table td {
+  padding: 6px 11px;
+  text-align: left;
+  border-bottom: 1px solid var(--line2);
+  white-space: pre-wrap;
+}
+
+.ref-table th {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--gold);
+  background: var(--gold-soft);
+  border-bottom-color: var(--gold-line);
+}
+
+.ref-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* 散文 --------------------------------------------------------------- */
+
+.chapter-body.prose {
+  max-width: 62rem;
+}
+
+.prose-block {
+  margin-bottom: 14px;
+  scroll-margin: 80px;
+}
+
+.prose-block.flash {
+  animation: flash 1.5s ease-out;
+  border-radius: 6px;
+}
+
+/* 第二層標題往內縮，兩層層級才看得出來（戰鬥流程的大步驟底下還有子項）。 */
+.prose-sub {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: var(--text);
+  padding-left: 12px;
+  border-left: 3px solid var(--gold-line);
+}
+
+.prose-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  color: var(--text2);
+}
+
+.prose-sub + .prose-body {
+  padding-left: 15px;
+}
+
+/* 勘誤 --------------------------------------------------------------- */
+
+.errata-change {
+  margin: 7px 0 0;
+  font-size: 11.5px;
+  color: var(--text3);
+}
+
+/* 右側小目錄 --------------------------------------------------------- */
+
+.section-nav {
+  border-left: 1px solid var(--line2);
+  padding: 18px 0 0 14px;
+  overflow-y: auto;
+}
+
+.section-link {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  font-size: 11.5px;
+  padding: 3px 0;
+  color: var(--text3);
+  background: none;
+  border: 0;
+  text-align: left;
+}
+
+.section-link:hover {
+  color: var(--text2);
+}
+
+.section-link.on {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.section-link i {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+/* Ctrl+K ------------------------------------------------------------- */
+
+.palette-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  display: flex;
+  justify-content: center;
+  padding-top: 12vh;
+  z-index: 10;
+}
+
+.palette {
+  width: min(680px, 92vw);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 18px 50px var(--shadow);
+  overflow: hidden;
+}
+
+.palette-input {
+  font: inherit;
+  font-size: 15px;
+  padding: 13px 16px;
+  color: var(--text);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.palette-input:focus {
+  outline: none;
+}
+
+.palette-list {
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.palette-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px;
+  align-items: baseline;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  text-align: left;
+}
+
+.palette-row.on {
+  background: var(--gold-soft);
+}
+
+.palette-name {
+  font-family: var(--serif);
+  font-size: 14px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.palette-where {
+  font-size: 10.5px;
+  color: var(--gold);
+  white-space: nowrap;
+}
+
+.palette-preview {
+  font-size: 11px;
+  color: var(--text3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-empty {
+  padding: 14px 12px;
+  font-size: 12px;
+  color: var(--text3);
+}
+
+/* 狀態 --------------------------------------------------------------- */
+
+.statusbar {
+  padding: 5px 18px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text3);
+  border-top: 1px solid var(--line2);
+  background: var(--bg2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.loading {
+  padding: 30px 18px;
+  color: var(--text3);
+}
+
+.error {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--gold-soft);
+  border-left: 3px solid var(--accent);
+  color: var(--text2);
+  font-size: 12px;
+}
+
+.startup-error {
+  max-width: 680px;
+  margin: 12vh auto;
+  padding: 0 24px;
+}
+
+.startup-error pre {
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  white-space: pre-wrap;
+  font-size: 12px;
+}
+
+code {
+  font-family: var(--mono);
+  padding: 1px 5px;
+  margin: 0 3px;
+  border-radius: 4px;
+  background: var(--gold-soft);
+  color: var(--text);
+}
