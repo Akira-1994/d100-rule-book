@@ -4,7 +4,11 @@
 
 完整的四階段開發計劃見 [docs/PLAN.md](docs/PLAN.md)。
 
-目前進度：**Phase 3 進行中** — 規則書瀏覽應用可跑，具備搜尋、篩選與專長詳情。
+目前進度：**Phase 3 進行中** — 應用已改版為兩層章節式的閱讀介面（像一本書，
+而不是一份可篩選的清單）。職業與專長兩章可讀，另有 Ctrl+K 全域跳轉與兩套主題；
+種族、物品、創角規則、附錄四章施工中。設計與計畫見
+[docs/superpowers/specs/](docs/superpowers/specs/) 與 [docs/superpowers/plans/](docs/superpowers/plans/)。
+
 Phase 2 已完成：31 張工作表中的 30 張納入 SQLite，規則層級疑問於 2026-09-20 由作者
 全數裁示（見 [docs/規則裁示紀錄.md](docs/規則裁示紀錄.md)）。
 
