@@ -19,7 +19,7 @@ use rusqlite::{Connection, OpenFlags};
 use serde::Serialize;
 
 pub use class::{ClassChapter, class_chapter};
-pub use feat::{FeatChapter, FeatDetail, FeatSummary, feat_chapter, feat_detail};
+pub use feat::{EntryDetail, FeatChapter, FeatSummary, entry_detail, feat_chapter};
 pub use search::{Facets, facets, search_feats};
 pub use toc::{Toc, toc};
 

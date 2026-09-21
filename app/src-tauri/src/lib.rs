@@ -2,7 +2,7 @@ mod db;
 
 use std::sync::Mutex;
 
-use db::{BuildInfo, ClassChapter, Db, Facets, FeatChapter, FeatDetail, FeatSummary, Toc};
+use db::{BuildInfo, ClassChapter, Db, EntryDetail, Facets, FeatChapter, FeatSummary, Toc};
 use tauri::Manager;
 
 /// 一次借出連線並執行查詢。
@@ -61,8 +61,12 @@ fn search_feats(
 }
 
 #[tauri::command]
-fn feat_detail(state: tauri::State<'_, Db>, id: String) -> Result<FeatDetail, String> {
-    with_conn(&state, |conn| db::feat_detail(conn, &id))
+fn entry_detail(
+    state: tauri::State<'_, Db>,
+    kind: String,
+    id: String,
+) -> Result<EntryDetail, String> {
+    with_conn(&state, |conn| db::entry_detail(conn, &kind, &id))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -84,7 +88,7 @@ pub fn run() {
             feat_chapter,
             facets,
             search_feats,
-            feat_detail
+            entry_detail
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
