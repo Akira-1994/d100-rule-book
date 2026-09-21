@@ -9,6 +9,7 @@
 
 pub mod feat;
 pub mod search;
+pub mod toc;
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -18,6 +19,7 @@ use serde::Serialize;
 
 pub use feat::{FeatDetail, FeatSummary, feat_detail};
 pub use search::{Facets, facets, search_feats};
+pub use toc::{Toc, toc};
 
 /// 開啟後常駐的連線。SQLite 的 Connection 不是 Sync，所以包一層 Mutex。
 pub struct Db(pub Mutex<Connection>);
