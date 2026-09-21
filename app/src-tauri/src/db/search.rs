@@ -9,7 +9,7 @@
 use rusqlite::Connection;
 use serde::Serialize;
 
-use super::preview;
+use super::{feat_address, preview};
 
 #[derive(Serialize)]
 pub struct SearchHit {
@@ -80,24 +80,19 @@ fn collect_feats(
 
     for row in rows {
         let (id, name, group, effect, class_name, path_name) = row.map_err(|e| e.to_string())?;
-        // 職業專長住在職業章節，其餘住在專長章節。分不清楚的話跳轉會落空。
-        let (chapter, tab, context) = match (group.as_str(), class_name) {
-            ("class", Some(class)) => {
-                let ctx = match &path_name {
-                    Some(p) => format!("{class} · {p}"),
-                    None => class.clone(),
-                };
-                ("classes", class, ctx)
-            }
-            _ => ("feats", group.clone(), String::new()),
+        let context = match (&class_name, &path_name) {
+            (Some(c), Some(p)) => format!("{c} · {p}"),
+            (Some(c), None) => c.clone(),
+            _ => String::new(),
         };
+        let (chapter, tab) = feat_address(&group, class_name);
         out.push(SearchHit {
             kind: "feat".into(),
             matched_name: name.contains(needle),
             preview: preview(&effect, 70),
             id,
             name,
-            chapter: chapter.into(),
+            chapter,
             tab,
             context,
         });

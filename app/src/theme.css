@@ -1,0 +1,126 @@
+/*
+ * 兩套主題，一組變數。
+ *
+ * 羊皮紙暖白（預設）與燭光皮革（暗色）共用同一組色相 —— 朱紅與古銅。
+ * 切換主題只換變數值，元件的 CSS 一律只引用變數，不寫死顏色。
+ *
+ * 唯一需要分開設計的是難度徽章與強調色：
+ *   - 深色底可以用燙金 #c9a227；亮色底上金色對比不足，改用深青銅 #8a6414 配白字。
+ *   - 朱紅 #9a3b23 在深底上會沉掉，暗色版提亮為赤陶 #e0764f。
+ */
+
+:root {
+  /* 亮：羊皮紙暖白 */
+  --bg: #f8f2e2;
+  --bg2: #ece2c9;
+  --card: #fffdf4;
+  --card-open: #fffef8;
+  --line: #ddd0ae;
+  --line2: #e6dcc3;
+  --text: #2c2418;
+  --text2: #55492f;
+  --text3: #8b7b5b;
+  --accent: #9a3b23;
+  --accent-ink: #fff8ec;
+  --accent-soft: rgba(154, 59, 35, 0.3);
+  --gold: #8a6414;
+  --gold-ink: #fffaf0;
+  --gold-soft: rgba(138, 100, 20, 0.12);
+  --gold-line: rgba(138, 100, 20, 0.35);
+  --shadow: rgba(90, 70, 30, 0.14);
+  --overlay: rgba(44, 36, 24, 0.42);
+
+  --serif: "Noto Serif TC", "Songti TC", "SimSun", Georgia, serif;
+  --sans: "Noto Sans TC", "Microsoft JhengHei", ui-sans-serif, system-ui, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  color-scheme: light;
+}
+
+/* 跟隨系統，除非使用者明確選了亮色 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #191310;
+    --bg2: #100c0a;
+    --card: #241c16;
+    --card-open: #2c231a;
+    --line: #3e3327;
+    --line2: #2b221a;
+    --text: #f5ecd8;
+    --text2: #c6b494;
+    --text3: #8b7c63;
+    --accent: #e0764f;
+    --accent-ink: #1b1209;
+    --accent-soft: rgba(224, 118, 79, 0.32);
+    --gold: #c9a227;
+    --gold-ink: #1b1209;
+    --gold-soft: rgba(201, 162, 39, 0.13);
+    --gold-line: rgba(201, 162, 39, 0.38);
+    --shadow: rgba(0, 0, 0, 0.45);
+    --overlay: rgba(9, 6, 4, 0.55);
+  }
+}
+
+/* 使用者明確選了暗色 */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #191310;
+  --bg2: #100c0a;
+  --card: #241c16;
+  --card-open: #2c231a;
+  --line: #3e3327;
+  --line2: #2b221a;
+  --text: #f5ecd8;
+  --text2: #c6b494;
+  --text3: #8b7c63;
+  --accent: #e0764f;
+  --accent-ink: #1b1209;
+  --accent-soft: rgba(224, 118, 79, 0.32);
+  --gold: #c9a227;
+  --gold-ink: #1b1209;
+  --gold-soft: rgba(201, 162, 39, 0.13);
+  --gold-line: rgba(201, 162, 39, 0.38);
+  --shadow: rgba(0, 0, 0, 0.45);
+  --overlay: rgba(9, 6, 4, 0.55);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text2);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.7;
+  /* 中文襯線在螢幕上撐不起大量內文，只有標題用襯線。 */
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--serif);
+  color: var(--text);
+  font-weight: 700;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

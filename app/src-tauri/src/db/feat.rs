@@ -3,7 +3,7 @@
 use rusqlite::Connection;
 use serde::Serialize;
 
-use super::multi_map;
+use super::{feat_address, multi_map};
 
 /// 章節裡的一張專長卡。與 `FeatDetail` 的差別是這裡不查前置與勘誤 ——
 /// 那些等使用者點開才查（`entry_detail`），整章一次撈會白做幾百次。
@@ -50,6 +50,11 @@ pub struct Prereq {
     pub ref_code: Option<String>,
     pub min_level: Option<i64>,
     pub raw_text: String,
+    /// 被指向的那條專長住在哪一章哪一頁。前置可能跨章（職業專長的前置
+    /// 常常是一般專長），光有 id 跳不過去，所以查詢時一併帶上 ——
+    /// 這比讓前端為了跳轉再往返一次省事。
+    pub ref_chapter: Option<String>,
+    pub ref_tab: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -57,6 +62,8 @@ pub struct Dependent {
     pub id: String,
     pub name: String,
     pub min_level: Option<i64>,
+    pub chapter: String,
+    pub tab: String,
 }
 
 #[derive(Serialize)]
@@ -69,6 +76,10 @@ pub struct EntryDetail {
     pub source_row: i64,
 }
 
+/// crate 同時建成 cdylib／staticlib，那些目標下 `pub` 不算「被觸及」，
+/// 所以尚未接上指令的東西會被判為 dead code。這兩個是階段 3 的 CP 試算
+/// 工具要用的，連同它的回歸測試一起原地保留，不是忘了刪。
+#[allow(dead_code)]
 #[derive(Serialize)]
 pub struct CpStep {
     pub level: i64,
@@ -98,14 +109,27 @@ pub fn entry_detail(conn: &Connection, kind: &str, id: &str) -> Result<EntryDeta
 
     let mut stmt = conn
         .prepare(
-            "SELECT p.kind, p.ref_feat_id, rf.name, p.ref_code, p.min_level, p.raw_text
+            "SELECT p.kind, p.ref_feat_id, rf.name, p.ref_code, p.min_level, p.raw_text,
+                    rf.feat_group, rp.class_name
              FROM feat_prereq p
              LEFT JOIN feat rf ON rf.id = p.ref_feat_id
+             LEFT JOIN class_path rp ON rp.id = rf.class_path_id
              WHERE p.feat_id = ?1 ORDER BY p.seq",
         )
         .map_err(|e| e.to_string())?;
     let prereqs: Vec<Prereq> = stmt
         .query_map([id], |r| {
+            let group: Option<String> = r.get(6)?;
+            let class_name: Option<String> = r.get(7)?;
+            let (ref_chapter, ref_tab) = match group {
+                Some(g) => {
+                    let (c, t) = feat_address(&g, class_name);
+                    (Some(c), Some(t))
+                }
+                // 前置指向的專長還沒建檔（kind=free 或 ref_code 只有名稱）時
+                // 沒有位址可跳，留 None 讓前端顯示成純文字。
+                None => (None, None),
+            };
             Ok(Prereq {
                 kind: r.get(0)?,
                 ref_feat_id: r.get(1)?,
@@ -113,6 +137,8 @@ pub fn entry_detail(conn: &Connection, kind: &str, id: &str) -> Result<EntryDeta
                 ref_code: r.get(3)?,
                 min_level: r.get(4)?,
                 raw_text: r.get(5)?,
+                ref_chapter,
+                ref_tab,
             })
         })
         .map_err(|e| e.to_string())?
@@ -123,17 +149,23 @@ pub fn entry_detail(conn: &Connection, kind: &str, id: &str) -> Result<EntryDeta
     // 「我點了這個之後能開出什麼」是建卡時最常問的問題。
     let mut stmt = conn
         .prepare(
-            "SELECT f.id, f.name, p.min_level FROM feat_prereq p
+            "SELECT f.id, f.name, p.min_level, f.feat_group, cp.class_name
+             FROM feat_prereq p
              JOIN feat f ON f.id = p.feat_id
+             LEFT JOIN class_path cp ON cp.id = f.class_path_id
              WHERE p.ref_feat_id = ?1 ORDER BY f.name",
         )
         .map_err(|e| e.to_string())?;
     let dependents: Vec<Dependent> = stmt
         .query_map([id], |r| {
+            let group: String = r.get(3)?;
+            let (chapter, tab) = feat_address(&group, r.get(4)?);
             Ok(Dependent {
                 id: r.get(0)?,
                 name: r.get(1)?,
                 min_level: r.get(2)?,
+                chapter,
+                tab,
             })
         })
         .map_err(|e| e.to_string())?
@@ -155,6 +187,7 @@ pub fn entry_detail(conn: &Connection, kind: &str, id: &str) -> Result<EntryDeta
 /// 創角色須知：CP 消耗公式為 `2^等級 × 技能難度`。等級 0 是獨立選項
 /// （只為免除該技能判定的 20% 減值），不計入升級的累積成本，因此
 /// 累計欄從等級 1 開始算。
+#[allow(dead_code)]
 pub fn cp_table(difficulty: Option<f64>) -> Vec<CpStep> {
     let Some(d) = difficulty else {
         return Vec::new();
@@ -328,6 +361,20 @@ mod tests {
             detail.dependents.iter().any(|d| d.name == "高等武器專精"),
             "〈高等武器專精〉應該把〈武器專精〉當前置"
         );
+
+        // 光有 id 跳不過去，前置與後續都要帶得出位址。
+        let p = detail
+            .prereqs
+            .iter()
+            .find(|p| p.ref_feat_name.as_deref() == Some("武器使用"))
+            .unwrap();
+        assert!(p.ref_chapter.is_some() && p.ref_tab.is_some(), "前置缺少位址");
+        let d = detail
+            .dependents
+            .iter()
+            .find(|d| d.name == "高等武器專精")
+            .unwrap();
+        assert!(!d.chapter.is_empty() && !d.tab.is_empty(), "後續缺少位址");
     }
 
     /// 創角色須知的原文範例：武器使用（難度1）學到等級 3 為 (2＋4＋8) = 14 點。

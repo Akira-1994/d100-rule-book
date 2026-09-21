@@ -121,6 +121,17 @@ pub(crate) fn multi_map(
     Ok(out)
 }
 
+/// 某條專長住在書裡的哪一章哪一頁。
+///
+/// 職業專長住在職業章節的該職業頁，其餘住在專長章節的 feat_group 頁。
+/// 搜尋結果與前置鏈跳轉都靠這個分流，弄錯的話跳轉會落空，所以只寫一次。
+pub(crate) fn feat_address(group: &str, class_name: Option<String>) -> (String, String) {
+    match (group, class_name) {
+        ("class", Some(class)) => ("classes".to_string(), class),
+        _ => ("feats".to_string(), group.to_string()),
+    }
+}
+
 pub fn build_info(conn: &Connection) -> Result<BuildInfo, String> {
     let get = |key: &str| -> String {
         conn.query_row(
