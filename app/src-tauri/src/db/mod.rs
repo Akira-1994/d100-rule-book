@@ -19,7 +19,7 @@ use rusqlite::{Connection, OpenFlags};
 use serde::Serialize;
 
 pub use class::{ClassChapter, class_chapter};
-pub use feat::{FeatDetail, FeatSummary, feat_detail};
+pub use feat::{FeatChapter, FeatDetail, FeatSummary, feat_chapter, feat_detail};
 pub use search::{Facets, facets, search_feats};
 pub use toc::{Toc, toc};
 
@@ -121,6 +121,26 @@ pub(crate) fn preview(text: &str, max_chars: usize) -> String {
         out.push('…');
     }
     out
+}
+
+/// 把「一個 id 對多個值」的查詢結果收成 map，保留查詢本身的排序。
+/// 用來一次撈完整章的分類與標記，避免每個條目各查一次。
+pub(crate) fn multi_map(
+    conn: &Connection,
+    sql: &str,
+    arg: &str,
+) -> Result<std::collections::HashMap<String, Vec<String>>, String> {
+    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([arg], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
+        .map_err(|e| e.to_string())?;
+    let mut out: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for row in rows {
+        let (id, value) = row.map_err(|e| e.to_string())?;
+        out.entry(id).or_default().push(value);
+    }
+    Ok(out)
 }
 
 pub fn build_info(conn: &Connection) -> Result<BuildInfo, String> {

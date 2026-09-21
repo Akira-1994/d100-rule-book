@@ -2,7 +2,7 @@ mod db;
 
 use std::sync::Mutex;
 
-use db::{BuildInfo, ClassChapter, Db, Facets, FeatDetail, FeatSummary, Toc};
+use db::{BuildInfo, ClassChapter, Db, Facets, FeatChapter, FeatDetail, FeatSummary, Toc};
 use tauri::Manager;
 
 /// 一次借出連線並執行查詢。
@@ -36,6 +36,11 @@ fn class_chapter(
     class_name: String,
 ) -> Result<ClassChapter, String> {
     with_conn(&state, |conn| db::class_chapter(conn, &class_name))
+}
+
+#[tauri::command]
+fn feat_chapter(state: tauri::State<'_, Db>, group: String) -> Result<FeatChapter, String> {
+    with_conn(&state, |conn| db::feat_chapter(conn, &group))
 }
 
 #[tauri::command]
@@ -76,6 +81,7 @@ pub fn run() {
             build_info,
             toc,
             class_chapter,
+            feat_chapter,
             facets,
             search_feats,
             feat_detail

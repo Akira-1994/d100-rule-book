@@ -11,6 +11,9 @@ use std::collections::HashMap;
 use rusqlite::Connection;
 use serde::Serialize;
 
+use super::feat::ChapterFeat;
+use super::multi_map;
+
 #[derive(Serialize)]
 pub struct ClassChapter {
     pub class_name: String,
@@ -30,23 +33,6 @@ pub struct ClassPath {
     /// 被動特性：沒有難度也不能用 CP 買（武僧的「不殺」、聖騎士的
     /// 「至善之魂」）。與 feats 分開，建卡介面才不會誤以為可以學。
     pub traits: Vec<ClassTrait>,
-}
-
-#[derive(Serialize)]
-pub struct ChapterFeat {
-    pub id: String,
-    pub name: String,
-    pub difficulty: Option<f64>,
-    pub difficulty_raw: Option<String>,
-    pub difficulty_scale: String,
-    pub categories: Vec<String>,
-    pub tags: Vec<String>,
-    /// 效果全文，不是預覽 —— 卡片預設就顯示完整敘述。
-    pub effect: String,
-    /// 有沒有前置決定卡片要不要提示「可展開」，不必為此再查一次。
-    pub prereq_count: i64,
-    pub source_sheet: String,
-    pub source_row: i64,
 }
 
 #[derive(Serialize)]
@@ -233,24 +219,6 @@ pub fn class_chapter(conn: &Connection, class_name: &str) -> Result<ClassChapter
         paths,
         invocations,
     })
-}
-
-/// 把「一個 id 對多個值」的查詢結果收成 map，保留查詢的排序。
-fn multi_map(
-    conn: &Connection,
-    sql: &str,
-    arg: &str,
-) -> Result<HashMap<String, Vec<String>>, String> {
-    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
-    let rows = stmt
-        .query_map([arg], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
-        .map_err(|e| e.to_string())?;
-    let mut out: HashMap<String, Vec<String>> = HashMap::new();
-    for row in rows {
-        let (id, value) = row.map_err(|e| e.to_string())?;
-        out.entry(id).or_default().push(value);
-    }
-    Ok(out)
 }
 
 #[cfg(test)]
