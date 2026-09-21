@@ -7,6 +7,7 @@
 //! 依章節拆成子模組：`feat`（專長與其詳情）、`search`（搜尋與分面）。
 //! 共用的連線管理、建置資訊與小工具留在這裡。
 
+pub mod class;
 pub mod feat;
 pub mod search;
 pub mod toc;
@@ -17,6 +18,7 @@ use std::sync::Mutex;
 use rusqlite::{Connection, OpenFlags};
 use serde::Serialize;
 
+pub use class::{ClassChapter, class_chapter};
 pub use feat::{FeatDetail, FeatSummary, feat_detail};
 pub use search::{Facets, facets, search_feats};
 pub use toc::{Toc, toc};
