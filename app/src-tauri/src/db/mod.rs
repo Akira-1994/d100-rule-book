@@ -19,8 +19,8 @@ use rusqlite::{Connection, OpenFlags};
 use serde::Serialize;
 
 pub use class::{ClassChapter, class_chapter};
-pub use feat::{EntryDetail, FeatChapter, FeatSummary, entry_detail, feat_chapter};
-pub use search::{Facets, facets, search_feats};
+pub use feat::{EntryDetail, FeatChapter, entry_detail, feat_chapter};
+pub use search::{SearchHit, search};
 pub use toc::{Toc, toc};
 
 /// 開啟後常駐的連線。SQLite 的 Connection 不是 Sync，所以包一層 Mutex。
@@ -90,28 +90,6 @@ pub struct BuildInfo {
 }
 
 // 共用查詢工具 -----------------------------------------------------------
-
-pub(crate) fn categories_of(
-    conn: &Connection,
-    feat_id: &str,
-) -> Result<Vec<String>, rusqlite::Error> {
-    let mut stmt = conn.prepare_cached(
-        "SELECT c.category FROM feat_category c
-         JOIN category k ON k.code = c.category
-         WHERE c.feat_id = ?1 ORDER BY k.sort_order",
-    )?;
-    let rows = stmt.query_map([feat_id], |r| r.get::<_, String>(0))?;
-    rows.collect()
-}
-
-/// 產生 n 個連續編號的佔位符（"?2,?3,?4"），並把游標往後推。
-pub(crate) fn numbered(next: &mut usize, n: usize) -> String {
-    let holes: Vec<String> = (0..n)
-        .map(|i| format!("?{}", *next + i))
-        .collect();
-    *next += n;
-    holes.join(",")
-}
 
 /// 取首幾個字做預覽。效果敘述常是整段多行文字，清單上只需要一眼掃過的長度。
 pub(crate) fn preview(text: &str, max_chars: usize) -> String {

@@ -5,19 +5,6 @@ use serde::Serialize;
 
 use super::multi_map;
 
-#[derive(Serialize)]
-pub struct FeatSummary {
-    pub id: String,
-    pub name: String,
-    pub feat_group: String,
-    pub difficulty: Option<f64>,
-    pub difficulty_raw: Option<String>,
-    pub difficulty_scale: String,
-    pub categories: Vec<String>,
-    pub class_path: Option<String>,
-    pub effect_preview: String,
-}
-
 /// 章節裡的一張專長卡。與 `FeatDetail` 的差別是這裡不查前置與勘誤 ——
 /// 那些等使用者點開才查（`entry_detail`），整章一次撈會白做幾百次。
 #[derive(Serialize)]
@@ -319,13 +306,13 @@ fn clone_feat(f: &ChapterFeat) -> ChapterFeat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::search::search_feats;
+    use crate::db::search::search;
     use crate::db::test_conn;
 
     #[test]
     fn 前置鏈雙向都查得到() {
         let c = test_conn();
-        let hit = search_feats(&c, "武器專精", &[], &[], 10).unwrap();
+        let hit = search(&c, "武器專精", 20).unwrap();
         let id = &hit
             .iter()
             .find(|f| f.name == "武器專精")
