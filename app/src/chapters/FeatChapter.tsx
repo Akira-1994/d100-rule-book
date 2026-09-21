@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { FeatChapter as Chapter, getFeatChapter } from "../api";
+import CardColumns, { estimateLines } from "../components/CardColumns";
 import FeatCard from "../components/FeatCard";
 import SectionNav, { NavItem } from "../components/SectionNav";
 import { Address, revealEntry } from "../nav";
@@ -71,11 +72,12 @@ export default function FeatChapter({
           >
             <div className="eyebrow">分類</div>
             <h2 className="path-name">{section.category}</h2>
-            <div className="card-grid">
-              {section.feats.map((feat) => (
-                <FeatCard key={feat.id} feat={feat} onNavigate={onNavigate} />
-              ))}
-            </div>
+            <CardColumns
+              items={section.feats}
+              keyOf={(f) => f.id}
+              weight={(f) => estimateLines(f.effect)}
+              render={(f) => <FeatCard feat={f} onNavigate={onNavigate} />}
+            />
           </section>
         ))}
 
@@ -86,11 +88,12 @@ export default function FeatChapter({
             <p className="path-desc">
               原表的分類欄留空。不臆測歸屬，照原樣列在這裡。
             </p>
-            <div className="card-grid">
-              {chapter.uncategorized.map((feat) => (
-                <FeatCard key={feat.id} feat={feat} onNavigate={onNavigate} />
-              ))}
-            </div>
+            <CardColumns
+              items={chapter.uncategorized}
+              keyOf={(f) => f.id}
+              weight={(f) => estimateLines(f.effect)}
+              render={(f) => <FeatCard feat={f} onNavigate={onNavigate} />}
+            />
           </section>
         )}
       </div>

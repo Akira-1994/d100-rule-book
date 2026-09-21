@@ -207,16 +207,28 @@ kbd {
 
 /* 卡片 --------------------------------------------------------------- */
 
-.card-grid {
+/*
+ * 兩欄不是 grid 而是兩疊獨立的卡（見 CardColumns.tsx）：grid 的每一列高度
+ * 等於該列較高的那張，矮的那張下方留白，列與列之間出現參差的溝；而且展開
+ * 左欄會把右欄整個往下推。切成兩欄之後，展開只影響同一欄。
+ */
+.card-columns {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 9px;
   align-items: start;
 }
 
+.card-column {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+}
+
 /* 兩欄把中文行長壓到約 40 字；窄視窗下硬撐兩欄反而更難讀。 */
 @media (max-width: 900px) {
-  .card-grid {
+  .card-columns {
     grid-template-columns: 1fr;
   }
   .chapter-layout {

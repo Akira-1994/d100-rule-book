@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { ClassChapter as Chapter, getClassChapter } from "../api";
+import CardColumns, { estimateLines } from "../components/CardColumns";
 import FeatCard from "../components/FeatCard";
 import SectionNav, { NavItem } from "../components/SectionNav";
 import { Address, revealEntry } from "../nav";
@@ -64,11 +65,12 @@ export default function ClassChapter({
             {path.description && <p className="path-desc">{path.description}</p>}
 
             {path.feats.length > 0 && (
-              <div className="card-grid">
-                {path.feats.map((feat) => (
-                  <FeatCard key={feat.id} feat={feat} onNavigate={onNavigate} />
-                ))}
-              </div>
+              <CardColumns
+                items={path.feats}
+                keyOf={(f) => f.id}
+                weight={(f) => estimateLines(f.effect)}
+                render={(f) => <FeatCard feat={f} onNavigate={onNavigate} />}
+              />
             )}
 
             {path.traits.length > 0 && (
@@ -77,17 +79,20 @@ export default function ClassChapter({
                 <p className="traits-note">
                   以下為被動特性，無法以 CP 購買或升級。
                 </p>
-                <div className="card-grid">
-                  {path.traits.map((t) => (
-                    <article key={t.id} className="feat-card" data-entry-id={t.id}>
+                <CardColumns
+                  items={path.traits}
+                  keyOf={(t) => t.id}
+                  weight={(t) => estimateLines(t.description)}
+                  render={(t) => (
+                    <article className="feat-card" data-entry-id={t.id}>
                       <div className="feat-head static">
                         <b className="feat-name">{t.name}</b>
                         <span className="chip tag">被動</span>
                       </div>
                       <p className="feat-effect">{t.description}</p>
                     </article>
-                  ))}
-                </div>
+                  )}
+                />
               </div>
             )}
           </section>
@@ -100,9 +105,12 @@ export default function ClassChapter({
             <p className="path-desc">
               祈喚不是可以升級的技能，消耗的是祈喚欄位而非 CP。
             </p>
-            <div className="card-grid">
-              {chapter.invocations.map((inv) => (
-                <article key={inv.id} className="feat-card" data-entry-id={inv.id}>
+            <CardColumns
+              items={chapter.invocations}
+              keyOf={(inv) => inv.id}
+              weight={(inv) => estimateLines(inv.effect)}
+              render={(inv) => (
+                <article className="feat-card" data-entry-id={inv.id}>
                   <div className="feat-head static">
                     <b className="feat-name">{inv.name}</b>
                     {(inv.cost !== null || inv.cost_raw) && (
@@ -114,8 +122,8 @@ export default function ClassChapter({
                   </div>
                   <p className="feat-effect">{inv.effect}</p>
                 </article>
-              ))}
-            </div>
+              )}
+            />
           </section>
         )}
       </div>
