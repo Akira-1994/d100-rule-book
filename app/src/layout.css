@@ -208,29 +208,20 @@ kbd {
 /* 卡片 --------------------------------------------------------------- */
 
 /*
- * 兩欄不是 grid 而是兩疊獨立的卡（見 CardColumns.tsx）：grid 的每一列高度
- * 等於該列較高的那張，矮的那張下方留白，列與列之間出現參差的溝；而且展開
- * 左欄會把右欄整個往下推。切成兩欄之後，展開只影響同一欄。
+ * 每列一張卡。兩欄排版會因為效果敘述長短不一而高度不均，展開時又會推動
+ * 另一欄，怎麼調都不整齊 —— 單欄沒有這個問題，左緣與卡片間距完全一致。
+ *
+ * 代價是行會變長，所以用 max-width 把版心壓在約 58 個中文字。這是書的
+ * 「行長」而不是視窗寬度：滿版的中文長行掃讀時很容易串行。
  */
-.card-columns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 9px;
-  align-items: start;
-}
-
-.card-column {
+.card-stack {
   display: flex;
   flex-direction: column;
   gap: 9px;
-  min-width: 0;
+  max-width: 62rem;
 }
 
-/* 兩欄把中文行長壓到約 40 字；窄視窗下硬撐兩欄反而更難讀。 */
 @media (max-width: 900px) {
-  .card-columns {
-    grid-template-columns: 1fr;
-  }
   .chapter-layout {
     grid-template-columns: 1fr;
   }
