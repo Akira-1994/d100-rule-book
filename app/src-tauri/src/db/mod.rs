@@ -9,6 +9,10 @@
 
 pub mod class;
 pub mod feat;
+pub mod item;
+pub mod prose;
+pub mod race;
+pub mod refs;
 pub mod search;
 pub mod toc;
 
@@ -21,6 +25,13 @@ use serde::Serialize;
 pub use class::{ClassChapter, class_chapter};
 pub use feat::{EntryDetail, FeatChapter, entry_detail, feat_chapter};
 pub use search::{SearchHit, search};
+pub use item::{
+    AffixChapter, DistributionGroup, MaterialChapter, affix_chapter, affix_distribution,
+    material_chapter, ref_sheet,
+};
+pub use prose::{ErrataEntry, ProseChapter, errata_list, prose_chapter};
+pub use race::{RaceChapter, race_chapter};
+pub use refs::{RefTable, RefTableSummary, ref_index};
 pub use toc::{Toc, toc};
 
 /// 開啟後常駐的連線。SQLite 的 Connection 不是 Sync，所以包一層 Mutex。

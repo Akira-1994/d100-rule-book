@@ -2,7 +2,11 @@ mod db;
 
 use std::sync::Mutex;
 
-use db::{BuildInfo, ClassChapter, Db, EntryDetail, FeatChapter, SearchHit, Toc};
+use db::{
+    AffixChapter, BuildInfo, ClassChapter, Db, DistributionGroup, EntryDetail, ErrataEntry,
+    FeatChapter, MaterialChapter, ProseChapter, RaceChapter, RefTable, RefTableSummary,
+    SearchHit, Toc,
+};
 use tauri::Manager;
 
 /// 一次借出連線並執行查詢。
@@ -44,6 +48,46 @@ fn feat_chapter(state: tauri::State<'_, Db>, group: String) -> Result<FeatChapte
 }
 
 #[tauri::command]
+fn race_chapter(state: tauri::State<'_, Db>) -> Result<RaceChapter, String> {
+    with_conn(&state, db::race_chapter)
+}
+
+#[tauri::command]
+fn affix_chapter(state: tauri::State<'_, Db>, tier: String) -> Result<AffixChapter, String> {
+    with_conn(&state, |conn| db::affix_chapter(conn, &tier))
+}
+
+#[tauri::command]
+fn material_chapter(state: tauri::State<'_, Db>) -> Result<MaterialChapter, String> {
+    with_conn(&state, db::material_chapter)
+}
+
+#[tauri::command]
+fn affix_distribution(state: tauri::State<'_, Db>) -> Result<Vec<DistributionGroup>, String> {
+    with_conn(&state, db::affix_distribution)
+}
+
+#[tauri::command]
+fn ref_sheet(state: tauri::State<'_, Db>, sheet: String) -> Result<Vec<RefTable>, String> {
+    with_conn(&state, |conn| db::ref_sheet(conn, &sheet))
+}
+
+#[tauri::command]
+fn ref_index(state: tauri::State<'_, Db>) -> Result<Vec<RefTableSummary>, String> {
+    with_conn(&state, db::ref_index)
+}
+
+#[tauri::command]
+fn prose_chapter(state: tauri::State<'_, Db>, sheet: String) -> Result<ProseChapter, String> {
+    with_conn(&state, |conn| db::prose_chapter(conn, &sheet))
+}
+
+#[tauri::command]
+fn errata_list(state: tauri::State<'_, Db>) -> Result<Vec<ErrataEntry>, String> {
+    with_conn(&state, db::errata_list)
+}
+
+#[tauri::command]
 fn search(state: tauri::State<'_, Db>, query: String) -> Result<Vec<SearchHit>, String> {
     with_conn(&state, |conn| db::search(conn, &query, 60))
 }
@@ -74,6 +118,14 @@ pub fn run() {
             toc,
             class_chapter,
             feat_chapter,
+            race_chapter,
+            affix_chapter,
+            material_chapter,
+            affix_distribution,
+            ref_sheet,
+            ref_index,
+            prose_chapter,
+            errata_list,
             search,
             entry_detail
         ])

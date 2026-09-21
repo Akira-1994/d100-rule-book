@@ -82,6 +82,21 @@ const AFFIX_TIERS: &[(&str, &str)] = &[
     ("eternal", "永恆聖器"),
 ];
 
+/// 某張散文工作表住在哪一章哪一頁。
+///
+/// 搜尋要跳到散文段落時需要這個對應，而對應的真相就是上面那兩張常數表 ——
+/// 在 search.rs 另寫一份遲早會對不起來。專長表的前言（基本專長、傳奇專長
+/// 那些）不是獨立頁籤，它們顯示在該組專長的章節裡，所以回 None。
+pub(crate) fn prose_address(sheet: &str) -> Option<(String, String)> {
+    if RULE_SHEETS.iter().any(|(s, _)| *s == sheet) {
+        return Some(("rules".into(), sheet.into()));
+    }
+    if APPENDIX_SHEETS.iter().any(|(s, _)| *s == sheet) {
+        return Some(("appendix".into(), sheet.into()));
+    }
+    None
+}
+
 pub fn toc(conn: &Connection) -> Result<Toc, String> {
     Ok(Toc {
         chapters: vec![

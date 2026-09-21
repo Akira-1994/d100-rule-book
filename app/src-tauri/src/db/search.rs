@@ -9,6 +9,7 @@
 use rusqlite::Connection;
 use serde::Serialize;
 
+use super::toc::prose_address;
 use super::{feat_address, preview};
 
 #[derive(Serialize)]
@@ -39,6 +40,10 @@ pub fn search(conn: &Connection, query: &str, limit: usize) -> Result<Vec<Search
     collect_feats(conn, &pattern, q, &mut hits)?;
     collect_traits(conn, &pattern, q, &mut hits)?;
     collect_invocations(conn, &pattern, q, &mut hits)?;
+    collect_affixes(conn, &pattern, q, &mut hits)?;
+    collect_material_affixes(conn, &pattern, q, &mut hits)?;
+    collect_races(conn, &pattern, q, &mut hits)?;
+    collect_prose(conn, &pattern, q, &mut hits)?;
 
     // 名稱命中優先，其次照章節與名稱，讓同一次搜尋的結果順序穩定。
     hits.sort_by(|a, b| {
@@ -187,6 +192,178 @@ fn collect_invocations(
     Ok(())
 }
 
+fn collect_affixes(
+    conn: &Connection,
+    pattern: &str,
+    needle: &str,
+    out: &mut Vec<SearchHit>,
+) -> Result<(), String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, name, affix_tier, effect FROM affix
+              WHERE name LIKE ?1 OR effect LIKE ?1",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([pattern], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
+    for row in rows {
+        let (id, name, tier, effect) = row.map_err(|e| e.to_string())?;
+        // 詞綴頁籤的代碼就是階級本身（general／advanced／eternal）。
+        out.push(SearchHit {
+            kind: "affix".into(),
+            matched_name: name.contains(needle),
+            preview: preview(&effect, 70),
+            context: "詞綴".into(),
+            chapter: "items".into(),
+            tab: tier,
+            id,
+            name,
+        });
+    }
+    Ok(())
+}
+
+fn collect_material_affixes(
+    conn: &Connection,
+    pattern: &str,
+    needle: &str,
+    out: &mut Vec<SearchHit>,
+) -> Result<(), String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT a.id, a.name, a.effect, m.name FROM material_affix a
+               JOIN material m ON m.id = a.material_id
+              WHERE a.name LIKE ?1 OR a.effect LIKE ?1",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([pattern], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
+    for row in rows {
+        let (id, name, effect, material) = row.map_err(|e| e.to_string())?;
+        out.push(SearchHit {
+            kind: "material_affix".into(),
+            matched_name: name.contains(needle),
+            preview: preview(&effect, 70),
+            context: format!("素材 · {material}"),
+            chapter: "items".into(),
+            tab: "material".into(),
+            id,
+            name,
+        });
+    }
+    Ok(())
+}
+
+fn collect_races(
+    conn: &Connection,
+    pattern: &str,
+    needle: &str,
+    out: &mut Vec<SearchHit>,
+) -> Result<(), String> {
+    // 種族沒有單一的「效果」欄，四個敘述欄都該比對到。
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, name,
+                    coalesce(attr_text, '') || ' ' || coalesce(racial_feat_text, '') || ' ' ||
+                    coalesce(skill_mod_text, '') || ' ' || coalesce(special_text, '')
+               FROM race
+              WHERE name LIKE ?1 OR attr_text LIKE ?1 OR racial_feat_text LIKE ?1
+                 OR skill_mod_text LIKE ?1 OR special_text LIKE ?1",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([pattern], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
+    for row in rows {
+        let (id, name, blob) = row.map_err(|e| e.to_string())?;
+        out.push(SearchHit {
+            kind: "race".into(),
+            matched_name: name.contains(needle),
+            preview: preview(blob.trim(), 70),
+            context: "種族".into(),
+            chapter: "races".into(),
+            tab: "all".into(),
+            id,
+            name,
+        });
+    }
+    Ok(())
+}
+
+fn collect_prose(
+    conn: &Connection,
+    pattern: &str,
+    needle: &str,
+    out: &mut Vec<SearchHit>,
+) -> Result<(), String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, sheet, section, subsection, body FROM rule_text
+              WHERE section LIKE ?1 OR subsection LIKE ?1 OR body LIKE ?1",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([pattern], |r| {
+            Ok((
+                r.get::<_, i64>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, Option<String>>(2)?,
+                r.get::<_, Option<String>>(3)?,
+                r.get::<_, String>(4)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
+    for row in rows {
+        let (id, sheet, section, subsection, body) = row.map_err(|e| e.to_string())?;
+        // 專長表的前言沒有自己的頁籤（它顯示在該組專長的章節裡），跳不過去
+        // 就不要列出來 —— 一個點下去沒反應的結果比沒有結果更糟。
+        let Some((chapter, tab)) = prose_address(&sheet) else {
+            continue;
+        };
+        let name = subsection
+            .clone()
+            .or_else(|| section.clone())
+            .unwrap_or_else(|| sheet.clone());
+        out.push(SearchHit {
+            kind: "rule_text".into(),
+            matched_name: name.contains(needle),
+            preview: preview(&body, 70),
+            context: sheet,
+            chapter,
+            tab,
+            id: id.to_string(),
+            name,
+        });
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -251,6 +428,47 @@ mod tests {
             .find(|h| h.kind == "class_trait")
             .expect("找不到被動特性〈不殺〉");
         assert_eq!(hit.tab, "武僧");
+    }
+
+    #[test]
+    fn 搜尋涵蓋詞綴素材種族與散文() {
+        let c = test_conn();
+
+        let hits = search(&c, "幽冥", 50).unwrap();
+        let affix = hits.iter().find(|h| h.kind == "affix").expect("找不到詞綴〈幽冥〉");
+        assert_eq!(affix.chapter, "items");
+        assert_eq!(affix.tab, "general", "詞綴的頁籤就是它的階級");
+
+        let hits = search(&c, "鳳火", 50).unwrap();
+        let mat = hits
+            .iter()
+            .find(|h| h.kind == "material_affix")
+            .expect("找不到素材詞綴〈鳳火〉");
+        assert_eq!(mat.tab, "material");
+        assert_eq!(mat.context, "素材 · 鳳羽");
+
+        let hits = search(&c, "精靈", 50).unwrap();
+        let race = hits.iter().find(|h| h.kind == "race").expect("找不到種族〈精靈〉");
+        assert_eq!(race.chapter, "races");
+
+        let hits = search(&c, "行動順序", 50).unwrap();
+        let prose = hits.iter().find(|h| h.kind == "rule_text").expect("找不到散文段落");
+        assert_eq!(prose.chapter, "rules");
+        assert_eq!(prose.tab, "戰鬥流程");
+    }
+
+    /// 專長表的前言沒有自己的頁籤（顯示在該組專長的章節裡），跳不過去就
+    /// 不該列出來 —— 一個點下去沒反應的結果比沒有結果更糟。
+    #[test]
+    fn 沒有頁籤可跳的散文不列入結果() {
+        let c = test_conn();
+        let hits = search(&c, "傳奇", 60).unwrap();
+        assert!(
+            hits.iter()
+                .filter(|h| h.kind == "rule_text")
+                .all(|h| !h.context.contains("專長")),
+            "專長表的前言不該出現在搜尋結果裡"
+        );
     }
 
     #[test]
