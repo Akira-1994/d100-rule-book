@@ -1,12 +1,14 @@
 mod db;
+mod rules;
 
 use std::sync::Mutex;
 
 use db::{
     AffixChapter, BuildInfo, ClassChapter, Db, DistributionGroup, EntryDetail, ErrataEntry,
     FeatChapter, MaterialChapter, ProseChapter, RaceChapter, RefTable, RefTableSummary,
-    SearchHit, Toc,
+    FeatDifficulty, SearchHit, Toc,
 };
+use rules::CpPlan;
 use tauri::Manager;
 
 /// 一次借出連線並執行查詢。
@@ -88,6 +90,17 @@ fn errata_list(state: tauri::State<'_, Db>) -> Result<Vec<ErrataEntry>, String> 
 }
 
 #[tauri::command]
+fn feat_difficulties(state: tauri::State<'_, Db>) -> Result<Vec<FeatDifficulty>, String> {
+    with_conn(&state, db::feat_difficulties)
+}
+
+/// CP 成本表。純計算，不碰資料庫。
+#[tauri::command]
+fn cp_plan(difficulty: f64, scale: String) -> CpPlan {
+    rules::cp_plan(difficulty, &scale)
+}
+
+#[tauri::command]
 fn search(state: tauri::State<'_, Db>, query: String) -> Result<Vec<SearchHit>, String> {
     with_conn(&state, |conn| db::search(conn, &query, 60))
 }
@@ -126,6 +139,8 @@ pub fn run() {
             ref_index,
             prose_chapter,
             errata_list,
+            feat_difficulties,
+            cp_plan,
             search,
             entry_detail
         ])

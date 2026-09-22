@@ -76,17 +76,6 @@ pub struct EntryDetail {
     pub source_row: i64,
 }
 
-/// crate 同時建成 cdylib／staticlib，那些目標下 `pub` 不算「被觸及」，
-/// 所以尚未接上指令的東西會被判為 dead code。這兩個是階段 3 的 CP 試算
-/// 工具要用的，連同它的回歸測試一起原地保留，不是忘了刪。
-#[allow(dead_code)]
-#[derive(Serialize)]
-pub struct CpStep {
-    pub level: i64,
-    pub step_cost: f64,
-    pub cumulative: f64,
-}
-
 /// 展開一張卡片時才查的內容：前置鏈、被誰當前置、來源列號。
 ///
 /// 卡片已經有名稱、難度、分類與效果全文了（章節查詢就帶了），這裡只補
@@ -182,30 +171,47 @@ pub fn entry_detail(conn: &Connection, kind: &str, id: &str) -> Result<EntryDeta
     })
 }
 
-/// 等級 0～5 的 CP 成本表。
+/// 全部專長的難度，供 CP 試算工具挑選。
 ///
-/// 創角色須知：CP 消耗公式為 `2^等級 × 技能難度`。等級 0 是獨立選項
-/// （只為免除該技能判定的 20% 減值），不計入升級的累積成本，因此
-/// 累計欄從等級 1 開始算。
-#[allow(dead_code)]
-pub fn cp_table(difficulty: Option<f64>) -> Vec<CpStep> {
-    let Some(d) = difficulty else {
-        return Vec::new();
-    };
-    let mut cumulative = 0.0;
-    (0..=5)
-        .map(|level| {
-            let step = (2f64).powi(level as i32) * d;
-            if level >= 1 {
-                cumulative += step;
-            }
-            CpStep {
-                level,
-                step_cost: step,
-                cumulative: if level == 0 { 0.0 } else { cumulative },
-            }
+/// 刻意不帶效果全文 —— 這是給挑選器用的清單，612 筆各自再塞一段敘述就
+/// 變成幾百 KB，而挑選器根本不顯示效果。
+#[derive(Serialize)]
+pub struct FeatDifficulty {
+    pub id: String,
+    pub name: String,
+    pub feat_group: String,
+    pub difficulty: Option<f64>,
+    pub difficulty_raw: Option<String>,
+    pub difficulty_scale: String,
+    pub class_name: Option<String>,
+}
+
+pub fn feat_difficulties(conn: &Connection) -> Result<Vec<FeatDifficulty>, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT f.id, f.name, f.feat_group, f.difficulty, f.difficulty_raw,
+                    f.difficulty_scale, p.class_name
+               FROM feat f
+               LEFT JOIN class_path p ON p.id = f.class_path_id
+              ORDER BY f.name",
+        )
+        .map_err(|e| e.to_string())?;
+    let list = stmt
+        .query_map([], |r| {
+            Ok(FeatDifficulty {
+                id: r.get(0)?,
+                name: r.get(1)?,
+                feat_group: r.get(2)?,
+                difficulty: r.get(3)?,
+                difficulty_raw: r.get(4)?,
+                difficulty_scale: r.get(5)?,
+                class_name: r.get(6)?,
+            })
         })
-        .collect()
+        .map_err(|e| e.to_string())?
+        .collect::<Result<_, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(list)
 }
 
 /// 非職業的六組專長，依分類分節。
@@ -377,20 +383,22 @@ mod tests {
         assert!(!d.chapter.is_empty() && !d.tab.is_empty(), "後續缺少位址");
     }
 
-    /// 創角色須知的原文範例：武器使用（難度1）學到等級 3 為 (2＋4＋8) = 14 點。
+    /// 〈知識〉〈語言〉的難度是 `1or2`，依 2026-09-20 的裁示由 DM 個案裁定。
+    /// 挑選器必須看得出「這條沒有固定難度」，才能提示使用者自己選。
     #[test]
-    fn cp表符合規則書範例() {
-        let table = cp_table(Some(1.0));
-        assert_eq!(table.len(), 6, "應涵蓋等級 0 到 5");
+    fn 難度清單保留非數值的原文() {
+        let c = test_conn();
+        let list = feat_difficulties(&c).unwrap();
+        assert_eq!(list.len(), 612);
 
-        assert_eq!(table[0].step_cost, 1.0, "等級 0 的花費是 2^0 × 難度");
-        assert_eq!(table[0].cumulative, 0.0, "等級 0 不計入升級累計");
+        let knowledge = list.iter().find(|f| f.name == "知識").expect("找不到〈知識〉");
+        assert!(knowledge.difficulty.is_none());
+        assert_eq!(knowledge.difficulty_raw.as_deref(), Some("1or2"));
 
-        assert_eq!(table[3].level, 3);
-        assert_eq!(table[3].cumulative, 14.0, "難度1學到等級3應為 14 點");
-        assert_eq!(table[5].step_cost, 32.0, "難度1的等級5單級為 32 點");
-
-        assert!(cp_table(None).is_empty(), "非數值難度不該產生成本表");
+        assert!(
+            list.iter().any(|f| f.difficulty_scale == "legend"),
+            "應該帶得出以傳奇技能點計價的條目"
+        );
     }
 
     #[test]

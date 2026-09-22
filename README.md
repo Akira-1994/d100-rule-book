@@ -4,10 +4,11 @@
 
 完整的四階段開發計劃見 [docs/PLAN.md](docs/PLAN.md)。
 
-目前進度：**Phase 3 進行中** — 應用已改版為兩層章節式的閱讀介面（像一本書，
-而不是一份可篩選的清單）。職業與專長兩章可讀，另有 Ctrl+K 全域跳轉與兩套主題；
-種族、物品、創角規則、附錄四章施工中。設計與計畫見
+目前進度：**Phase 3 的閱讀介面已完成** — 應用改版為兩層章節式的閱讀介面
+（像一本書，而不是一份可篩選的清單）。六個章節全部可讀，31 張工作表中的 30 張
+都有對應頁面，另有 Ctrl+K 全域跳轉、兩套主題與 CP 試算工具。設計與計畫見
 [docs/superpowers/specs/](docs/superpowers/specs/) 與 [docs/superpowers/plans/](docs/superpowers/plans/)。
+尚未做的是編輯功能與版本比對頁（見 [docs/PLAN.md](docs/PLAN.md)）。
 
 Phase 2 已完成：31 張工作表中的 30 張納入 SQLite，規則層級疑問於 2026-09-20 由作者
 全數裁示（見 [docs/規則裁示紀錄.md](docs/規則裁示紀錄.md)）。

@@ -23,7 +23,7 @@ use rusqlite::{Connection, OpenFlags};
 use serde::Serialize;
 
 pub use class::{ClassChapter, class_chapter};
-pub use feat::{EntryDetail, FeatChapter, entry_detail, feat_chapter};
+pub use feat::{EntryDetail, FeatChapter, FeatDifficulty, entry_detail, feat_chapter, feat_difficulties};
 pub use search::{SearchHit, search};
 pub use item::{
     AffixChapter, DistributionGroup, MaterialChapter, affix_chapter, affix_distribution,

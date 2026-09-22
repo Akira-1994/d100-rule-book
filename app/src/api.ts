@@ -293,6 +293,51 @@ export interface SearchHit {
   matched_name: boolean;
 }
 
+// CP 試算 ----------------------------------------------------------------
+
+/**
+ * 專長分組的中文名稱。資料庫存英文代碼，顯示一律用中文。
+ *
+ * 目錄（toc）本身就帶得出各頁籤的中文標題，所以一般情況不需要這張表；
+ * 這裡是給「不在章節脈絡裡」的地方用的 —— 例如試算工具的挑選器，
+ * 它列出的專長橫跨所有分組。
+ */
+export const GROUP_LABELS: Record<string, string> = {
+  basic: "基本專長",
+  general: "一般專長",
+  advanced: "高級專長",
+  metamagic: "超魔專長",
+  crafting: "製作專長",
+  legendary: "傳奇專長",
+  class: "職業專長",
+};
+
+export interface FeatDifficulty {
+  id: string;
+  name: string;
+  feat_group: string;
+  difficulty: number | null;
+  difficulty_raw: string | null;
+  difficulty_scale: string;
+  class_name: string | null;
+}
+
+export interface CpStep {
+  level: number;
+  /** 這一級本身的花費。單位依 scale：cp 是 CP，legend 是傳奇技能點。 */
+  step_cost: number;
+  /** 從 1 級累計到本級。等級 0 不計入。 */
+  cumulative: number;
+  /** 累計換算成 CP。scale 為 cp 時與 cumulative 相同。 */
+  cumulative_cp: number;
+}
+
+export interface CpPlan {
+  difficulty: number;
+  scale: string;
+  steps: CpStep[];
+}
+
 // 建置資訊 ----------------------------------------------------------------
 
 export interface BuildInfo {
@@ -343,6 +388,12 @@ export const getProseChapter = (sheet: string) =>
   invoke<ProseChapter>("prose_chapter", { sheet });
 
 export const getErrataList = () => invoke<ErrataEntry[]>("errata_list");
+
+export const getFeatDifficulties = () =>
+  invoke<FeatDifficulty[]>("feat_difficulties");
+
+export const getCpPlan = (difficulty: number, scale: string) =>
+  invoke<CpPlan>("cp_plan", { difficulty, scale });
 
 // 顯示用的格式化 ----------------------------------------------------------
 
