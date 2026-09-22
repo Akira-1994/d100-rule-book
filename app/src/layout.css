@@ -497,6 +497,98 @@ kbd {
   padding-left: 15px;
 }
 
+/* CP 試算 ------------------------------------------------------------ */
+
+.calc-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.calc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--gold);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.calc-field input,
+.calc-field select {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 9px;
+}
+
+.calc-pick {
+  flex: 1;
+  min-width: 220px;
+}
+
+.calc-matches {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  max-width: 62rem;
+}
+
+.calc-match {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  width: 100%;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  text-align: left;
+}
+
+.calc-match:hover {
+  background: var(--gold-soft);
+}
+
+.calc-match b {
+  font-family: var(--serif);
+  font-size: 14px;
+  color: var(--text);
+}
+
+.calc-match-diff {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text3);
+}
+
+.calc-picked {
+  margin: 0 0 14px;
+  font-size: 12.5px;
+}
+
+/* 需 DM 裁定的難度要看得出來，程式不替它挑一個數字。 */
+.calc-warn {
+  color: var(--accent);
+}
+
+.calc-note {
+  margin: 7px 0 0;
+  font-size: 11px;
+  color: var(--text3);
+}
+
 /* 勘誤 --------------------------------------------------------------- */
 
 .errata-change {

@@ -1,20 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 
 import { ErrataEntry, RefTableSummary, getErrataList, getRefIndex } from "../api";
+import CpCalculator from "../components/CpCalculator";
 import SectionNav, { NavItem } from "../components/SectionNav";
 
 /**
- * 附錄的兩個非散文頁籤：對照表總覽與勘誤清單。
- * （世界觀、大陸簡史那幾個走 ProseChapter；CP 試算是階段 3。）
+ * 附錄的三個非散文頁籤：對照表總覽、CP 試算、勘誤清單。
+ * （世界觀、大陸簡史那幾個走 ProseChapter。）
  */
 export default function AppendixChapter({ kind }: { kind: string }) {
   if (kind === "ref_index") return <RefIndexView />;
   if (kind === "errata") return <ErrataView />;
-  return (
-    <p className="loading">
-      CP 試算工具於階段 3 補上。CP 消耗公式為 2^等級 × 難度，等級 0 另計。
-    </p>
-  );
+  return <CpCalculator />;
 }
 
 function RefIndexView() {
