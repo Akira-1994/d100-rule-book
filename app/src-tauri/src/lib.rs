@@ -129,8 +129,7 @@ fn append_errata(
     // 寫壞 errata 會讓整個建置停擺，所以追加後先確認檔案仍可解析。
     if let Err(e) = editing::rebuild::yaml_parses(&path) {
         editing::yaml::restore(&path, before)?;
-        return Err(format!("產生的勘誤無法解析，已還原檔案：
-{e}"));
+        return Err(format!("產生的勘誤無法解析，已還原檔案：\n{e}"));
     }
 
     // 重建要覆寫 dist/d100.db，Windows 上檔案開著就寫不進去。
