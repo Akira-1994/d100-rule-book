@@ -278,6 +278,8 @@ export interface EntryDetail {
   dependents: Dependent[];
   source_sheet: string;
   source_row: number;
+  /** 並排區塊的欄號。編輯時要寫進勘誤的 col: 才定位得到正確的條目。 */
+  source_col: number;
 }
 
 // 搜尋 --------------------------------------------------------------------
@@ -338,6 +340,57 @@ export interface CpPlan {
   steps: CpStep[];
 }
 
+// 編輯 --------------------------------------------------------------------
+//
+// 只在開發模式有作用。打包版的 editing_enabled 為 false，入口不會渲染。
+
+export interface EditingStatus {
+  enabled: boolean;
+  python_ok: boolean;
+  /** Python 不可用時的說明，讓按鈕在按下去之前就知道自己不能用。 */
+  python_hint: string | null;
+}
+
+export type FieldKind = "text" | "number" | "string_list";
+
+export interface EditableField {
+  name: string;
+  label: string;
+  kind: FieldKind;
+  /** 有值時要做成選項而不是自由輸入 */
+  options: string[] | null;
+  hint: string | null;
+}
+
+export interface EditRequest {
+  entry_kind: string;
+  sheet: string;
+  row: number;
+  /** 有 source_col 的條目才帶；詞綴與素材詞綴沒有這個概念。 */
+  col: number | null;
+  reason: string;
+  /** 只含有改動的欄位。 */
+  changes: Record<string, unknown>;
+}
+
+export interface RebuildResult {
+  ok: boolean;
+  /** 成功時是建置摘要，失敗時是 build_db.py 的 stderr 原文。 */
+  output: string;
+}
+
+export interface ErrataCommit {
+  hash: string;
+  subject: string;
+  date: string;
+}
+
+export interface ErrataHistory {
+  uncommitted: string;
+  commits: ErrataCommit[];
+  unavailable: string | null;
+}
+
 // 建置資訊 ----------------------------------------------------------------
 
 export interface BuildInfo {
@@ -394,6 +447,16 @@ export const getFeatDifficulties = () =>
 
 export const getCpPlan = (difficulty: number, scale: string) =>
   invoke<CpPlan>("cp_plan", { difficulty, scale });
+
+export const getEditingStatus = () => invoke<EditingStatus>("editing_status");
+
+export const getEditableFields = (entryKind: string) =>
+  invoke<EditableField[]>("editable_fields", { entryKind });
+
+export const appendErrata = (request: EditRequest) =>
+  invoke<RebuildResult>("append_errata", { request });
+
+export const getErrataHistory = () => invoke<ErrataHistory>("errata_history");
 
 // 顯示用的格式化 ----------------------------------------------------------
 

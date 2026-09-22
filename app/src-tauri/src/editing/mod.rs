@@ -191,9 +191,13 @@ pub struct EditRequest {
     pub entry_kind: String,
     pub sheet: String,
     pub row: i64,
-    /// Tier C 的職業表並排多個區塊，同一列可能有數個條目。一律帶上，
-    /// 不去判斷「這次需不需要」—— 判斷錯會把勘誤套到隔壁欄的條目上。
-    pub col: i64,
+    /// Tier C 的職業表並排多個區塊，同一列可能有數個條目，此時必須以 col
+    /// 指明是哪一欄的那一個。
+    ///
+    /// **有 source_col 的條目一律帶上，沒有的就不帶。** `apply_errata` 比對的
+    /// 是 `record.get("source_col", 1)`，而詞綴與素材詞綴在解析結果裡根本
+    /// 沒有這個欄位 —— 硬寫一個猜出來的 col 比不寫更危險。
+    pub col: Option<i64>,
     pub reason: String,
     /// 只含**有改動**的欄位。沒動的欄位不該出現在勘誤裡，否則清單上會是
     /// 一堆「把 X 改成 X」的雜訊，而那份清單是要拿去跟作者對帳的。
@@ -266,7 +270,7 @@ mod tests {
             entry_kind: "feat".into(),
             sheet: "高級專長".into(),
             row: 19,
-            col: 1,
+            col: Some(1),
             reason: "測試".into(),
             changes: serde_json::from_value(changes).unwrap(),
         }

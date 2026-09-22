@@ -8,6 +8,8 @@ import {
   formatDifficulty,
   getEntryDetail,
 } from "../api";
+import EditDialog from "./EditDialog";
+import { useEditing } from "../editing";
 import type { Address } from "../nav";
 
 /**
@@ -25,8 +27,10 @@ export default function FeatCard({
   onNavigate: (address: Address) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [detail, setDetail] = useState<EntryDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const edit = useEditing();
 
   useEffect(() => {
     if (!open || detail) return;
@@ -97,12 +101,45 @@ export default function FeatCard({
                   ))}
                 </p>
               )}
-              <div className="source">
-                {detail.source_sheet} R{detail.source_row}
+              <div className="expand-foot">
+                <span className="source">
+                  {detail.source_sheet} R{detail.source_row}
+                </span>
+                {/* 編輯只在開發模式出現：它要寫 repo 裡的檔案並重跑 Python
+                    管線，打包版沒有這些東西。 */}
+                {edit.status.enabled && (
+                  <button
+                    className="edit-open"
+                    disabled={!edit.status.python_ok}
+                    title={edit.status.python_hint ?? undefined}
+                    onClick={() => setEditing(true)}
+                  >
+                    編輯
+                  </button>
+                )}
               </div>
             </>
           )}
         </div>
+      )}
+
+      {editing && detail && (
+        <EditDialog
+          entryKind="feat"
+          entryName={feat.name}
+          sheet={detail.source_sheet}
+          row={detail.source_row}
+          col={detail.source_col}
+          current={{
+            difficulty: feat.difficulty,
+            difficulty_raw: feat.difficulty_raw,
+            effect: feat.effect,
+            categories: feat.categories,
+            tags: feat.tags,
+          }}
+          onClose={() => setEditing(false)}
+          onApplied={edit.onApplied}
+        />
       )}
     </article>
   );

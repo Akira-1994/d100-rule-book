@@ -85,8 +85,12 @@ fn header(sheet: &str) -> String {
 fn entry_block(request: &EditRequest) -> String {
     let mut out = String::from("\n");
     out.push_str(&format!("  - row: {}\n", request.row));
-    // 一律帶 col：Tier C 的職業表並排多個區塊，同一列可能有數個條目。
-    out.push_str(&format!("    col: {}\n", request.col));
+    // 有 source_col 的條目才帶 col。詞綴與素材詞綴在解析結果裡沒有這個
+    // 欄位（`apply_errata` 會以預設值 1 比對），寫一個猜出來的值只會讓
+    // 勘誤定位失敗。
+    if let Some(col) = request.col {
+        out.push_str(&format!("    col: {col}\n"));
+    }
     if let Some(target) = target_for(&request.entry_kind) {
         out.push_str(&format!("    target: {target}\n"));
     }
@@ -100,31 +104,33 @@ fn entry_block(request: &EditRequest) -> String {
 
 /// 理由用 `>-` 折疊區塊，與現有檔案一致。
 ///
-/// 折疊區塊會把換行併成空白，所以先把使用者輸入的連續空白正規化成單一
-/// 空白 —— 否則行首多出來的縮排會被 YAML 當成字面換行，讀回來與寫進去
-/// 的不一樣。
+/// 折疊區塊會把換行**併成一個空白**。對英文那是對的，對中文就是在字與字
+/// 之間插了一個不該有的空格 —— 實際跑過一次才發現「驗完即還原」被存成
+/// 「驗完 即還原」。因此只在本來就有空白的地方折行：那正是折疊插入的
+/// 空白無害的位置。中文長句沒有空白可折，就讓它留成一行。
 fn folded_reason(reason: &str) -> String {
-    let flat = reason.split_whitespace().collect::<Vec<_>>().join(" ");
+    let words: Vec<&str> = reason.split_whitespace().collect();
     let mut out = String::from("    reason: >-\n");
-    for chunk in wrap(&flat, 60) {
-        out.push_str(&format!("      {chunk}\n"));
+    for line in fold_at_spaces(&words, 60) {
+        out.push_str(&format!("      {line}\n"));
     }
     out
 }
 
-/// 依顯示寬度折行。中文字元算兩格，折出來的寬度才與看到的一致。
-fn wrap(text: &str, width: usize) -> Vec<String> {
-    let mut lines = Vec::new();
+/// 把詞串成行，只在詞與詞之間換行。寬度以顯示寬度計（中文算兩格），
+/// 但寬度只是偏好 —— 一個詞再長也不切開。
+fn fold_at_spaces(words: &[&str], width: usize) -> Vec<String> {
+    let mut lines: Vec<String> = Vec::new();
     let mut current = String::new();
-    let mut used = 0;
-    for ch in text.chars() {
-        let w = if (ch as u32) > 0x2000 { 2 } else { 1 };
-        if used + w > width && !current.is_empty() {
+    for word in words {
+        let candidate = display_width(&current) + 1 + display_width(word);
+        if !current.is_empty() && candidate > width {
             lines.push(std::mem::take(&mut current));
-            used = 0;
         }
-        current.push(ch);
-        used += w;
+        if !current.is_empty() {
+            current.push(' ');
+        }
+        current.push_str(word);
     }
     if !current.is_empty() {
         lines.push(current);
@@ -133,6 +139,12 @@ fn wrap(text: &str, width: usize) -> Vec<String> {
         lines.push(String::new());
     }
     lines
+}
+
+fn display_width(text: &str) -> usize {
+    text.chars()
+        .map(|ch| if (ch as u32) > 0x2000 { 2 } else { 1 })
+        .sum()
 }
 
 /// 值一律以 JSON 輸出。JSON 是 YAML 的子集，字串的 `\n`、引號跳脫、
@@ -158,7 +170,7 @@ mod tests {
             entry_kind: "feat".into(),
             sheet: sheet.into(),
             row: 19,
-            col: 3,
+            col: Some(3),
             reason: "本團把難度調低，原值對新手太苛。".into(),
             changes: serde_json::from_value(changes).unwrap(),
         }
@@ -220,9 +232,46 @@ mod tests {
         let dir = temp_dir("target");
         let mut req = request("素材詞綴", json!({ "roll_max": 70 }));
         req.entry_kind = "material_affix".into();
+        req.col = None;
         let path = append_to_dir(&dir, &req).unwrap();
 
-        assert!(fs::read_to_string(&path).unwrap().contains("target: material_affix"));
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(text.contains("target: material_affix"));
+        assert!(!text.contains("col:"), "沒有 source_col 的條目不該寫 col");
+    }
+
+    /// YAML 的折疊區塊會把換行併成空白。中文沒有詞間空白，硬折行等於在
+    /// 字中間插空格 —— 這是實際跑過一次才發現的。
+    #[test]
+    fn 中文理由不會被折行插入空格() {
+        let dir = temp_dir("fold");
+        let long = "這是一段很長的中文理由用來確認折疊區塊不會在字與字之間插入多餘的空白因為那會讓存進資料庫的理由與寫進去的不一樣";
+        let mut req = request("高級專長", json!({ "difficulty": 4 }));
+        req.reason = long.into();
+        let path = append_to_dir(&dir, &req).unwrap();
+
+        let text = fs::read_to_string(&path).unwrap();
+        // 中文長句沒有空白可折，整段要留在同一行。
+        assert!(text.contains(&format!("      {long}\n")), "實際內容：{text}");
+    }
+
+    /// 英文在詞間折行是安全的 —— 折疊插入的空白本來就在那裡。
+    #[test]
+    fn 英文理由在詞間折行() {
+        let dir = temp_dir("fold-en");
+        let mut req = request("高級專長", json!({ "difficulty": 4 }));
+        req.reason = "the quick brown fox ".repeat(10);
+        let path = append_to_dir(&dir, &req).unwrap();
+
+        let text = fs::read_to_string(&path).unwrap();
+        let body: Vec<&str> = text
+            .lines()
+            .skip_while(|l| !l.contains("reason: >-"))
+            .skip(1)
+            .take_while(|l| l.starts_with("      "))
+            .collect();
+        assert!(body.len() > 1, "長英文應該折成多行");
+        assert!(body.iter().all(|l| !l.trim().is_empty()));
     }
 
     #[test]

@@ -1,14 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { BuildInfo, Toc, getBuildInfo, getToc } from "./api";
+import {
+  BuildInfo,
+  EditingStatus,
+  Toc,
+  getBuildInfo,
+  getEditingStatus,
+  getToc,
+} from "./api";
 import AppendixChapter from "./chapters/AppendixChapter";
 import ClassChapter from "./chapters/ClassChapter";
 import FeatChapter from "./chapters/FeatChapter";
 import ItemChapter from "./chapters/ItemChapter";
+import HistoryChapter from "./chapters/HistoryChapter";
 import ProseChapter from "./chapters/ProseChapter";
 import RaceChapter from "./chapters/RaceChapter";
 import CommandPalette from "./components/CommandPalette";
 import ThemeToggle from "./components/ThemeToggle";
+import { EditingProvider } from "./editing";
 import { Address, revealEntry, sameTab, useNavigation } from "./nav";
 import "./theme.css";
 import "./layout.css";
@@ -23,14 +32,19 @@ export default function App() {
   const [toc, setToc] = useState<Toc | null>(null);
   const [startupError, setStartupError] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [editing, setEditing] = useState<EditingStatus | null>(null);
+  // 重建之後用來強迫章節元件重新抓資料。位址不變，所以捲動位置與所在頁籤
+  // 都保持原樣 —— 改完一條專長跳回第一章會很煩。
+  const [dataVersion, setDataVersion] = useState(0);
 
   const { address, goto, gotoChapter } = useNavigation(toc);
 
   useEffect(() => {
-    Promise.all([getBuildInfo(), getToc()])
-      .then(([i, t]) => {
+    Promise.all([getBuildInfo(), getToc(), getEditingStatus()])
+      .then(([i, t, e]) => {
         setInfo(i);
         setToc(t);
+        setEditing(e);
       })
       .catch((e) => setStartupError(String(e)));
   }, []);
@@ -72,12 +86,22 @@ export default function App() {
     );
   }
 
-  if (!toc || !address) return <div className="loading">載入規則書⋯</div>;
+  if (!toc || !address || !editing) {
+    return <div className="loading">載入規則書⋯</div>;
+  }
+
+  // 重建會改變條目數，目錄要跟著更新。
+  const applied = () => {
+    getBuildInfo().then(setInfo).catch(() => {});
+    getToc().then(setToc).catch(() => {});
+    setDataVersion((v) => v + 1);
+  };
 
   const chapter = toc.chapters.find((c) => c.key === address.chapter);
   const tab = chapter?.tabs.find((t) => t.key === address.tab);
 
   return (
+    <EditingProvider value={{ status: editing, onApplied: applied }}>
     <div className="app">
       <header className="chapter-bar">
         {toc.chapters.map((c) => (
@@ -111,7 +135,9 @@ export default function App() {
         ))}
       </nav>
 
-      <main className="page">{tab && renderChapter(tab, address, navigate)}</main>
+      <main className="page">
+        {tab && renderChapter(tab, address, navigate, dataVersion)}
+      </main>
 
       <footer className="statusbar">
         {info && (
@@ -128,6 +154,7 @@ export default function App() {
         onPick={navigate}
       />
     </div>
+    </EditingProvider>
   );
 }
 
@@ -141,12 +168,15 @@ function renderChapter(
   tab: { key: string; kind: string },
   address: Address,
   navigate: (a: Address) => void,
+  /** 資料重建的版本號。併進 key 就能在重建後強迫章節重新抓資料。 */
+  version: number,
 ) {
+  const key = `${tab.key}:${version}`;
   switch (tab.kind) {
     case "class":
       return (
         <ClassChapter
-          key={tab.key}
+          key={key}
           className={tab.key}
           onNavigate={navigate}
           pending={address.anchor}
@@ -155,29 +185,31 @@ function renderChapter(
     case "feats":
       return (
         <FeatChapter
-          key={tab.key}
+          key={key}
           group={tab.key}
           onNavigate={navigate}
           pending={address.anchor}
         />
       );
     case "race":
-      return <RaceChapter key={tab.key} pending={address.anchor} />;
+      return <RaceChapter key={key} pending={address.anchor} />;
     case "affix":
     case "material":
     case "ref_sheet":
     case "affix_distribution":
       return (
         <ItemChapter
-          key={tab.key}
+          key={key}
           kind={tab.kind}
           tabKey={tab.key}
           pending={address.anchor}
         />
       );
     case "prose":
-      return <ProseChapter key={tab.key} sheet={tab.key} pending={address.anchor} />;
+      return <ProseChapter key={key} sheet={tab.key} pending={address.anchor} />;
+    case "history":
+      return <HistoryChapter key={key} />;
     default:
-      return <AppendixChapter key={tab.key} kind={tab.kind} />;
+      return <AppendixChapter key={key} kind={tab.kind} />;
   }
 }
