@@ -34,8 +34,67 @@ pub use race::{RaceChapter, race_chapter};
 pub use refs::{RefTable, RefTableSummary, ref_index};
 pub use toc::{Toc, toc};
 
-/// 開啟後常駐的連線。SQLite 的 Connection 不是 Sync，所以包一層 Mutex。
-pub struct Db(pub Mutex<Connection>);
+/// 開啟後常駐的連線。
+///
+/// SQLite 的 Connection 不是 Sync，所以包一層 Mutex。裡面是 Option 而不是
+/// 直接放 Connection，因為重建資料庫時必須先放開檔案 —— Windows 上
+/// `build_db.py` 寫不進一個還被開著的檔案。重建期間這裡會是 None，
+/// 查詢在那段時間會拿到「正在重建」的錯誤。
+pub struct Db {
+    conn: Mutex<Option<Connection>>,
+    /// 目前這條連線開的是哪個檔案。重建之後要用同一個路徑重開。
+    pub(crate) path: PathBuf,
+}
+
+impl Db {
+    pub fn new(path: PathBuf, conn: Connection) -> Self {
+        Self {
+            conn: Mutex::new(Some(conn)),
+            path,
+        }
+    }
+
+    /// 借出連線執行查詢。
+    ///
+    /// Mutex 中毒（別的執行緒在持鎖時 panic）時回報錯誤字串，讓前端顯示
+    /// 訊息而不是整個 app 一起 panic。
+    pub fn with<T>(
+        &self,
+        f: impl FnOnce(&Connection) -> Result<T, String>,
+    ) -> Result<T, String> {
+        let guard = self
+            .conn
+            .lock()
+            .map_err(|_| "資料庫連線狀態異常，請重新開啟應用。".to_string())?;
+        match guard.as_ref() {
+            Some(conn) => f(conn),
+            None => Err("資料庫正在重建，請稍候再試。".to_string()),
+        }
+    }
+
+    /// 放開連線與檔案。重建前必須先做這件事 —— 丟棄 Connection 就會關閉
+    /// 檔案控制代碼，Windows 上 `build_db.py` 才寫得進去。
+    pub fn close(&self) -> Result<(), String> {
+        let mut guard = self
+            .conn
+            .lock()
+            .map_err(|_| "資料庫連線狀態異常，請重新開啟應用。".to_string())?;
+        *guard = None;
+        Ok(())
+    }
+
+    /// 重新開啟。重建無論成功或失敗都要呼叫 —— 一次失敗不該讓應用
+    /// 再也查不了東西。
+    pub fn reopen(&self) -> Result<(), String> {
+        let conn = open(&self.path)?;
+        let mut guard = self
+            .conn
+            .lock()
+            .map_err(|_| "資料庫連線狀態異常，請重新開啟應用。".to_string())?;
+        *guard = Some(conn);
+        Ok(())
+    }
+}
 
 /// 開發模式的資料庫位置：從 src-tauri 往上兩層就是 repo 根目錄。
 pub fn dev_path() -> PathBuf {

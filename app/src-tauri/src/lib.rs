@@ -1,8 +1,6 @@
 mod db;
 mod rules;
 
-use std::sync::Mutex;
-
 use db::{
     AffixChapter, BuildInfo, ClassChapter, Db, DistributionGroup, EntryDetail, ErrataEntry,
     FeatChapter, MaterialChapter, ProseChapter, RaceChapter, RefTable, RefTableSummary,
@@ -11,19 +9,12 @@ use db::{
 use rules::CpPlan;
 use tauri::Manager;
 
-/// 一次借出連線並執行查詢。
-///
-/// Mutex 中毒（別的執行緒在持鎖時 panic）時直接回報錯誤字串，
-/// 讓前端顯示「請重開應用」而不是整個 app 一起 panic。
+/// 一次借出連線並執行查詢。連線的生命週期管理在 `Db` 裡。
 fn with_conn<T>(
     state: &tauri::State<'_, Db>,
     f: impl FnOnce(&rusqlite::Connection) -> Result<T, String>,
 ) -> Result<T, String> {
-    let guard = state
-        .0
-        .lock()
-        .map_err(|_| "資料庫連線狀態異常，請重新開啟應用。".to_string())?;
-    f(&guard)
+    state.with(f)
 }
 
 #[tauri::command]
@@ -123,7 +114,7 @@ pub fn run() {
             // 每次查詢都報錯的空視窗容易診斷得多。
             let path = db::locate(app.handle())?;
             let conn = db::open(&path)?;
-            app.manage(Db(Mutex::new(conn)));
+            app.manage(Db::new(path, conn));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
