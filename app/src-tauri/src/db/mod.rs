@@ -107,37 +107,52 @@ pub fn dev_path() -> PathBuf {
 
 /// 找出資料庫檔案。
 ///
-/// 開發時讀 repo 的 `dist/d100.db`，發佈版讀打包進去的 resource。
+/// **開發時優先讀 repo 的 `dist/d100.db`，發佈版優先讀打包進去的 resource。**
+///
+/// 順序很重要，而且曾經是反過來的：`npm run sync-db` 會把 dist 複製一份到
+/// `src-tauri/resources/`，那個複本在 `tauri dev` 底下也解析得到。resource
+/// 排在前面時，應用讀的是那份複本而不是 `build_db.py` 剛寫好的 dist ——
+/// 重跑建置後畫面不會變，而且完全沒有錯誤訊息，因為兩個檔案都是好的。
+///
 /// 兩種情況都找不到時回報所有找過的位置，比單純說「檔案不存在」好除錯。
 pub fn locate(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     use tauri::Manager;
 
-    let mut tried: Vec<PathBuf> = Vec::new();
+    let resource = app
+        .path()
+        .resolve("resources/d100.db", tauri::path::BaseDirectory::Resource)
+        .ok();
 
-    if let Ok(resource) = app.path().resolve(
-        "resources/d100.db",
-        tauri::path::BaseDirectory::Resource,
-    ) {
-        if resource.is_file() {
-            return Ok(resource);
+    let tried = candidates(resource, dev_path());
+    for path in &tried {
+        if path.is_file() {
+            return Ok(path.clone());
         }
-        tried.push(resource);
     }
-
-    let dev = dev_path();
-    if dev.is_file() {
-        return Ok(dev);
-    }
-    tried.push(dev);
 
     Err(format!(
-        "找不到規則書資料庫。已尋找：{}\n請先執行 python tools/build_db.py",
+        "找不到規則書資料庫。已尋找：{}
+請先執行 python tools/build_db.py",
         tried
             .iter()
             .map(|p| p.display().to_string())
             .collect::<Vec<_>>()
             .join("、")
     ))
+}
+
+/// 依序要試的位置。抽成純函式是為了讓順序本身有測試 —— 這裡弄反過的代價
+/// 是「改了資料卻看不到變化」，而那不會有任何錯誤訊息。
+fn candidates(resource: Option<PathBuf>, dev: PathBuf) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    if cfg!(debug_assertions) {
+        out.push(dev);
+        out.extend(resource);
+    } else {
+        out.extend(resource);
+        out.push(dev);
+    }
+    out
 }
 
 pub fn open(path: &PathBuf) -> Result<Connection, String> {
@@ -243,6 +258,28 @@ pub(crate) fn test_conn() -> Connection {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 開發時必須先看 dist —— 那是 build_db.py 寫的檔案。resource 是
+    /// sync-db 留下的複本，排在前面會讓重建後的改動看不見。
+    #[test]
+    fn 開發模式優先讀dist() {
+        let resource = PathBuf::from("resources/d100.db");
+        let dev = PathBuf::from("dist/d100.db");
+        let order = candidates(Some(resource.clone()), dev.clone());
+
+        assert_eq!(order.len(), 2);
+        if cfg!(debug_assertions) {
+            assert_eq!(order[0], dev, "開發模式要先看 dist");
+        } else {
+            assert_eq!(order[0], resource, "發佈版要先看打包進去的 resource");
+        }
+    }
+
+    #[test]
+    fn 沒有resource時仍然找得到dist() {
+        let dev = PathBuf::from("dist/d100.db");
+        assert_eq!(candidates(None, dev.clone()), vec![dev]);
+    }
 
     #[test]
     fn 建置資訊有內容() {
