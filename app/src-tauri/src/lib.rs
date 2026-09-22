@@ -1,4 +1,5 @@
 mod db;
+mod editing;
 mod rules;
 
 use db::{
@@ -6,6 +7,9 @@ use db::{
     FeatChapter, MaterialChapter, ProseChapter, RaceChapter, RefTable, RefTableSummary,
     FeatDifficulty, SearchHit, Toc,
 };
+use editing::history::ErrataHistory;
+use editing::rebuild::RebuildResult;
+use editing::{EditRequest, EditableField, EditingStatus};
 use rules::CpPlan;
 use tauri::Manager;
 
@@ -91,6 +95,65 @@ fn cp_plan(difficulty: f64, scale: String) -> CpPlan {
     rules::cp_plan(difficulty, &scale)
 }
 
+// 編輯 ------------------------------------------------------------------
+//
+// 只在開發模式有作用。打包版的 editing_enabled() 為 false，前端不會渲染
+// 入口；後端這裡仍然多擋一層，不倚賴前端自律。
+
+#[tauri::command]
+fn editing_status() -> EditingStatus {
+    editing::status()
+}
+
+#[tauri::command]
+fn editable_fields(entry_kind: String) -> &'static [EditableField] {
+    editing::fields_for(&entry_kind)
+}
+
+/// 追加一筆勘誤並重建資料庫。
+///
+/// 三個步驟任一失敗都要讓狀態回到可用：寫壞的檔案還原、關掉的連線重開。
+#[tauri::command]
+fn append_errata(
+    state: tauri::State<'_, Db>,
+    request: EditRequest,
+) -> Result<RebuildResult, String> {
+    if !editing::editing_enabled() {
+        return Err("編輯功能只在開發模式開啟。".into());
+    }
+    editing::validate(&request)?;
+
+    let before = editing::yaml::snapshot(&request.sheet);
+    let path = editing::yaml::append(&request)?;
+
+    // 寫壞 errata 會讓整個建置停擺，所以追加後先確認檔案仍可解析。
+    if let Err(e) = editing::rebuild::yaml_parses(&path) {
+        editing::yaml::restore(&path, before)?;
+        return Err(format!("產生的勘誤無法解析，已還原檔案：
+{e}"));
+    }
+
+    // 重建要覆寫 dist/d100.db，Windows 上檔案開著就寫不進去。
+    state.close()?;
+    let result = editing::rebuild::run();
+    // 無論成功失敗都要把連線開回來，否則一次失敗會讓應用再也查不了東西。
+    state.reopen()?;
+
+    if !result.ok {
+        editing::yaml::restore(&path, before)?;
+        // 還原之後要再重建一次，否則資料庫停在半途的狀態。
+        state.close()?;
+        let _ = editing::rebuild::run();
+        state.reopen()?;
+    }
+    Ok(result)
+}
+
+#[tauri::command]
+fn errata_history() -> ErrataHistory {
+    editing::history::history()
+}
+
 #[tauri::command]
 fn search(state: tauri::State<'_, Db>, query: String) -> Result<Vec<SearchHit>, String> {
     with_conn(&state, |conn| db::search(conn, &query, 60))
@@ -132,6 +195,10 @@ pub fn run() {
             errata_list,
             feat_difficulties,
             cp_plan,
+            editing_status,
+            editable_fields,
+            append_errata,
+            errata_history,
             search,
             entry_detail
         ])
