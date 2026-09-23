@@ -18,6 +18,12 @@ npm run tauri dev
 python ../tools/build_db.py && npm run sync-db
 ```
 
+**從終端機重建時要先關掉應用。** 開發模式讀的是 repo 的 `dist/d100.db` 本身
+（不是 `sync-db` 的複本，否則改完看不到變化），Windows 上那個檔案被開著就
+寫不進去，`build_db.py` 會以 `PermissionError` 中止。
+
+應用內的編輯功能沒有這個問題 —— 它會先放開連線再重建，完了自己接回來。
+
 ## 打包
 
 ```bash
