@@ -131,6 +131,18 @@ pub fn toc(conn: &Connection) -> Result<Toc, String> {
                 }],
             },
             Chapter {
+                key: "sheets".into(),
+                title: "角色卡".into(),
+                tabs: vec![Tab {
+                    key: "all".into(),
+                    title: "我的角色".into(),
+                    kind: "sheets".into(),
+                    // 角色卡在使用者資料夾裡，不是資料庫的內容，所以這裡
+                    // 給不出條目數 —— 數量由前端自己列。
+                    count: 0,
+                }],
+            },
+            Chapter {
                 key: "appendix".into(),
                 title: "附錄".into(),
                 tabs: appendix_tabs(conn)?,
@@ -296,14 +308,14 @@ mod tests {
         let keys: Vec<&str> = toc.chapters.iter().map(|c| c.key.as_str()).collect();
         assert_eq!(
             keys,
-            vec!["rules", "feats", "classes", "items", "races", "appendix"]
+            vec!["rules", "feats", "classes", "items", "races", "sheets", "appendix"]
         );
 
         for chapter in &toc.chapters {
             assert!(!chapter.tabs.is_empty(), "章節「{}」沒有頁籤", chapter.title);
             for tab in &chapter.tabs {
                 // 工具頁（CP 試算、修改紀錄）沒有條目數。
-                if matches!(tab.kind.as_str(), "cp_calc" | "history") {
+                if matches!(tab.kind.as_str(), "cp_calc" | "history" | "sheets") {
                     continue;
                 }
                 assert!(

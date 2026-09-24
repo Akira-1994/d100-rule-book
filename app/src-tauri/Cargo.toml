@@ -20,6 +20,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
+# 角色卡的匯入匯出需要檔案選擇器。讓使用者手打絕對路徑不可接受。
+tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # bundled 讓 SQLite 直接編進執行檔，使用者的機器不需要另外安裝。

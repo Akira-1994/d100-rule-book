@@ -25,7 +25,9 @@ export type TabKind =
   | "affix_distribution"
   | "ref_index"
   | "cp_calc"
-  | "errata";
+  | "errata"
+  | "history"
+  | "sheets";
 
 export interface Tab {
   key: string;
@@ -393,6 +395,124 @@ export interface ErrataHistory {
   unavailable: string | null;
 }
 
+// 角色卡 ------------------------------------------------------------------
+//
+// 這是本專案第一個「使用者資料」—— 規則書資料庫是建置產物、勘誤在 repo 裡，
+// 角色卡兩者都不是：它屬於玩家，存在使用者資料夾。
+
+/** 一條專長屬於哪一軌。見 docs/規則裁示紀錄.md 第 12 項。 */
+export type Track = "melee" | "spell" | "none";
+
+export const TRACK_LABELS: Record<Track, string> = {
+  melee: "進戰",
+  spell: "法術",
+  none: "皆非",
+};
+
+export interface SheetFeat {
+  feat_id: string;
+  level: number;
+  track: Track;
+}
+
+/** 獎勵 HP/SP 的擲骰結果。程式算得出該擲幾顆，算不出點數。 */
+export interface BonusRolls {
+  melee_hp: number;
+  melee_sp: number;
+  spell_hp: number;
+  spell_sp: number;
+}
+
+export interface Adjustment {
+  delta: number;
+  note: string;
+}
+
+export interface Sheet {
+  schema_version: number;
+  id: string;
+  name: string;
+  starting_cp: number;
+  attributes: Record<string, number>;
+  race_id: string | null;
+  feats: SheetFeat[];
+  bonus: BonusRolls;
+  manual_hp: number;
+  manual_sp: number;
+  extra_hp: number;
+  extra_sp: number;
+  adjustments: Record<string, Adjustment>;
+  notes: string;
+}
+
+export interface SheetSummary {
+  id: string;
+  name: string;
+  /** 讀不起來的卡也會列出來並說明原因，不會靜靜消失。 */
+  error: string | null;
+}
+
+export interface DerivedValue {
+  label: string;
+  formula: number;
+  adjustment: number;
+  note: string;
+  /** 顯示值 = 公式值 + 修正 */
+  total: number;
+}
+
+export interface CpSummary {
+  starting: number;
+  attribute_adjustment: number;
+  race: number;
+  feats: number;
+  legend_as_cp: number;
+  extra_hp: number;
+  extra_sp: number;
+  available: number;
+  spent: number;
+  remaining: number;
+  melee_invested: number;
+  spell_invested: number;
+}
+
+export interface PoolSummary {
+  attribute_part: number;
+  rolled: number;
+  manual: number;
+  base: number;
+  extra_target: number;
+  extra_cost: number;
+  total: number;
+}
+
+export interface Derived {
+  modifiers: Record<string, number>;
+  skills: DerivedValue[];
+  resists: DerivedValue[];
+  specials: DerivedValue[];
+  cp: CpSummary;
+  hp: PoolSummary;
+  sp: PoolSummary;
+  melee_dice_steps: number;
+  spell_dice_steps: number;
+  /** 軟性警告。一律只提示、不擋存檔。 */
+  warnings: string[];
+}
+
+/** 九大屬性的顯示順序與中文名。資料庫的 attribute 表是權威清單。 */
+export const ATTRIBUTES: { code: string; name: string }[] = [
+  { code: "STR", name: "力量" },
+  { code: "DEX", name: "敏捷" },
+  { code: "SKI", name: "技巧" },
+  { code: "CON", name: "體質" },
+  { code: "RES", name: "抗力" },
+  { code: "INT", name: "智力" },
+  { code: "WIS", name: "智慧" },
+  { code: "CHA", name: "魅力" },
+  { code: "SPI", name: "精神" },
+];
+
 // 建置資訊 ----------------------------------------------------------------
 
 export interface BuildInfo {
@@ -459,6 +579,16 @@ export const appendErrata = (request: EditRequest) =>
   invoke<RebuildResult>("append_errata", { request });
 
 export const getErrataHistory = () => invoke<ErrataHistory>("errata_history");
+
+export const listSheets = () => invoke<SheetSummary[]>("list_sheets");
+export const loadSheet = (id: string) => invoke<Sheet>("load_sheet", { id });
+export const saveSheet = (sheet: Sheet) => invoke<void>("save_sheet", { sheet });
+export const newSheet = (name: string) => invoke<Sheet>("new_sheet", { name });
+export const deleteSheet = (id: string) => invoke<void>("delete_sheet", { id });
+export const importSheet = (path: string) => invoke<Sheet>("import_sheet", { path });
+export const exportSheet = (id: string, path: string) =>
+  invoke<void>("export_sheet", { id, path });
+export const deriveSheet = (sheet: Sheet) => invoke<Derived>("derive_sheet", { sheet });
 
 // 顯示用的格式化 ----------------------------------------------------------
 

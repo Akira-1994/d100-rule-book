@@ -15,6 +15,7 @@ import ItemChapter from "./chapters/ItemChapter";
 import HistoryChapter from "./chapters/HistoryChapter";
 import ProseChapter from "./chapters/ProseChapter";
 import RaceChapter from "./chapters/RaceChapter";
+import SheetChapter from "./chapters/SheetChapter";
 import CommandPalette from "./components/CommandPalette";
 import ThemeToggle from "./components/ThemeToggle";
 import { EditingProvider } from "./editing";
@@ -232,6 +233,10 @@ function renderChapter(
       return <ProseChapter key={key} sheet={tab.key} pending={address.anchor} />;
     case "history":
       return <HistoryChapter key={key} />;
+    case "sheets":
+      // 角色卡不吃 dataVersion —— 它的資料在使用者資料夾，跟規則書資料庫
+      // 的重建無關，跟著重建而整個卸載只會白丟未存的編輯。
+      return <SheetChapter key={tab.key} />;
     default:
       return <AppendixChapter key={key} kind={tab.kind} />;
   }
