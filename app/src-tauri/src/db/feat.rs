@@ -74,6 +74,8 @@ pub struct EntryDetail {
     pub dependents: Vec<Dependent>,
     pub source_sheet: String,
     pub source_row: i64,
+    /// 並排區塊的欄號。編輯時要寫進勘誤的 `col:` 才定位得到正確的條目。
+    pub source_col: i64,
 }
 
 /// 展開一張卡片時才查的內容：前置鏈、被誰當前置、來源列號。
@@ -88,11 +90,11 @@ pub fn entry_detail(conn: &Connection, kind: &str, id: &str) -> Result<EntryDeta
         return Err(format!("尚未支援的條目種類：{kind}"));
     }
 
-    let (sheet, row_no) = conn
+    let (sheet, row_no, col_no) = conn
         .query_row(
-            "SELECT source_sheet, source_row FROM feat WHERE id = ?1",
+            "SELECT source_sheet, source_row, source_col FROM feat WHERE id = ?1",
             [id],
-            |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)),
+            |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?, r.get::<_, i64>(2)?)),
         )
         .map_err(|e| format!("找不到專長 {id}：{e}"))?;
 
@@ -168,6 +170,7 @@ pub fn entry_detail(conn: &Connection, kind: &str, id: &str) -> Result<EntryDeta
         dependents,
         source_sheet: sheet,
         source_row: row_no,
+        source_col: col_no,
     })
 }
 

@@ -264,6 +264,16 @@ fn appendix_tabs(conn: &Connection) -> Result<Vec<Tab>, String> {
         kind: "errata".into(),
         count: count(conn, "SELECT count(*) FROM errata", &[]),
     });
+    // 修改紀錄只在開發模式出現 —— 它讀的是 git 與 repo 裡的檔案，
+    // 打包版兩者都沒有。
+    if crate::editing::editing_enabled() {
+        tabs.push(Tab {
+            key: "history".into(),
+            title: "修改紀錄".into(),
+            kind: "history".into(),
+            count: 0,
+        });
+    }
     Ok(tabs)
 }
 
@@ -292,8 +302,8 @@ mod tests {
         for chapter in &toc.chapters {
             assert!(!chapter.tabs.is_empty(), "章節「{}」沒有頁籤", chapter.title);
             for tab in &chapter.tabs {
-                // CP 試算是工具頁，沒有條目數。
-                if tab.kind == "cp_calc" {
+                // 工具頁（CP 試算、修改紀錄）沒有條目數。
+                if matches!(tab.kind.as_str(), "cp_calc" | "history") {
                     continue;
                 }
                 assert!(

@@ -62,6 +62,8 @@ pub struct MaterialAffix {
     pub roll_min: i64,
     pub roll_max: i64,
     pub effect: String,
+    /// 編輯時要用來定位勘誤。與母素材同一張工作表，但明講比讓前端推斷好。
+    pub source_sheet: String,
     pub source_row: i64,
 }
 
@@ -162,7 +164,7 @@ pub fn material_chapter(conn: &Connection) -> Result<MaterialChapter, String> {
         let mut stmt = conn
             .prepare(
                 "SELECT material_id, id, name, tier_rank, rarity_multiplier,
-                        roll_min, roll_max, effect, source_row
+                        roll_min, roll_max, effect, source_sheet, source_row
                    FROM material_affix ORDER BY tier_rank, source_row",
             )
             .map_err(|e| e.to_string())?;
@@ -178,7 +180,8 @@ pub fn material_chapter(conn: &Connection) -> Result<MaterialChapter, String> {
                         roll_min: r.get(5)?,
                         roll_max: r.get(6)?,
                         effect: r.get(7)?,
-                        source_row: r.get(8)?,
+                        source_sheet: r.get(8)?,
+                        source_row: r.get(9)?,
                     },
                 ))
             })
@@ -320,6 +323,7 @@ mod tests {
         assert_eq!(phoenix.affixes.len(), 3);
         assert_eq!(phoenix.affixes[0].roll_min, 1);
         assert_eq!(phoenix.affixes[0].roll_max, 70);
+        assert_eq!(phoenix.affixes[0].source_sheet, "素材詞綴", "編輯定位要用到");
         assert!(!phoenix.slots.is_empty(), "素材應帶得出可附的部位");
     }
 

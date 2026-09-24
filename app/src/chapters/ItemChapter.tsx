@@ -12,6 +12,7 @@ import {
   getMaterialChapter,
   getRefSheet,
 } from "../api";
+import EditButton from "../components/EditButton";
 import RefTableView from "../components/RefTableView";
 import SectionNav, { NavItem } from "../components/SectionNav";
 import { revealEntry } from "../nav";
@@ -128,8 +129,18 @@ function AffixCard({
           <span className="chip tag">{affix.plus_cost_raw}</span>
         )}
       </div>
-      <div className="source">
-        {affix.source_sheet} R{affix.source_row}
+      <div className="expand-foot">
+        <span className="source">
+          {affix.source_sheet} R{affix.source_row}
+        </span>
+        {/* 詞綴沒有並排區塊，所以不帶 col —— 解析結果裡根本沒有那個欄位。 */}
+        <EditButton
+          entryKind="affix"
+          entryName={affix.name}
+          sheet={affix.source_sheet}
+          row={affix.source_row}
+          current={{ effect: affix.effect }}
+        />
       </div>
     </article>
   );
@@ -203,6 +214,22 @@ function MaterialSection({ material }: { material: Material }) {
               )}
             </div>
             <p className="feat-effect">{a.effect}</p>
+            <div className="expand-foot">
+              <span className="source">
+                {a.source_sheet} R{a.source_row}
+              </span>
+              <EditButton
+                entryKind="material_affix"
+                entryName={a.name}
+                sheet={a.source_sheet}
+                row={a.source_row}
+                current={{
+                  roll_min: a.roll_min,
+                  roll_max: a.roll_max,
+                  effect: a.effect,
+                }}
+              />
+            </div>
           </article>
         ))}
       </div>

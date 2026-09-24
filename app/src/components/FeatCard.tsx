@@ -8,6 +8,7 @@ import {
   formatDifficulty,
   getEntryDetail,
 } from "../api";
+import EditButton from "./EditButton";
 import type { Address } from "../nav";
 
 /**
@@ -97,13 +98,30 @@ export default function FeatCard({
                   ))}
                 </p>
               )}
-              <div className="source">
-                {detail.source_sheet} R{detail.source_row}
+              <div className="expand-foot">
+                <span className="source">
+                  {detail.source_sheet} R{detail.source_row}
+                </span>
+                <EditButton
+                  entryKind="feat"
+                  entryName={feat.name}
+                  sheet={detail.source_sheet}
+                  row={detail.source_row}
+                  col={detail.source_col}
+                  current={{
+                    difficulty: feat.difficulty,
+                    difficulty_raw: feat.difficulty_raw,
+                    effect: feat.effect,
+                    categories: feat.categories,
+                    tags: feat.tags,
+                  }}
+                />
               </div>
             </>
           )}
         </div>
       )}
+
     </article>
   );
 }

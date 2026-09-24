@@ -148,14 +148,26 @@ mod tests {
         assert_eq!(ch.tables[0].name, "等級與 CP 總數對照");
     }
 
+    /// 不斷言固定筆數：編輯功能存在之後，勘誤筆數本來就會隨 data/errata
+    /// 變動，寫死一個數字等於每次有人編輯就壞一次。改驗不隨內容變動的性質。
     #[test]
     fn 勘誤清單完整且每筆都有理由() {
         let c = test_conn();
         let list = errata_list(&c).unwrap();
-        assert_eq!(list.len(), 38);
+
+        let total: i64 = c
+            .query_row("SELECT count(*) FROM errata", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(list.len() as i64, total, "清單不該漏掉任何一筆");
+        assert!(total > 0, "資料庫裡應該有勘誤");
+
         assert!(
             list.iter().all(|e| !e.reason.trim().is_empty()),
             "每一筆勘誤都必須寫明理由 —— 這份清單是要拿去跟作者對帳的"
+        );
+        assert!(
+            list.iter().all(|e| e.action == "set" || e.action == "flag"),
+            "action 只有修正與標記兩種"
         );
     }
 }

@@ -1,14 +1,23 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { BuildInfo, Toc, getBuildInfo, getToc } from "./api";
+import {
+  BuildInfo,
+  EditingStatus,
+  Toc,
+  getBuildInfo,
+  getEditingStatus,
+  getToc,
+} from "./api";
 import AppendixChapter from "./chapters/AppendixChapter";
 import ClassChapter from "./chapters/ClassChapter";
 import FeatChapter from "./chapters/FeatChapter";
 import ItemChapter from "./chapters/ItemChapter";
+import HistoryChapter from "./chapters/HistoryChapter";
 import ProseChapter from "./chapters/ProseChapter";
 import RaceChapter from "./chapters/RaceChapter";
 import CommandPalette from "./components/CommandPalette";
 import ThemeToggle from "./components/ThemeToggle";
+import { EditingProvider } from "./editing";
 import { Address, revealEntry, sameTab, useNavigation } from "./nav";
 import "./theme.css";
 import "./layout.css";
@@ -23,23 +32,37 @@ export default function App() {
   const [toc, setToc] = useState<Toc | null>(null);
   const [startupError, setStartupError] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [editing, setEditing] = useState<EditingStatus | null>(null);
+  // 重建之後用來強迫章節元件重新抓資料。位址不變，所以捲動位置與所在頁籤
+  // 都保持原樣 —— 改完一條專長跳回第一章會很煩。
+  const [dataVersion, setDataVersion] = useState(0);
+  // 重建期間資料庫連線是關著的，任何查詢都會失敗。與其讓人看到一片紅字，
+  // 不如先把會觸發查詢的入口擋住並說明正在做什麼。
+  const [rebuilding, setRebuilding] = useState(false);
 
   const { address, goto, gotoChapter } = useNavigation(toc);
 
   useEffect(() => {
-    Promise.all([getBuildInfo(), getToc()])
-      .then(([i, t]) => {
+    Promise.all([getBuildInfo(), getToc(), getEditingStatus()])
+      .then(([i, t, e]) => {
         setInfo(i);
         setToc(t);
+        setEditing(e);
       })
       .catch((e) => setStartupError(String(e)));
   }, []);
+
+  // 快速鍵的監聽只掛一次，用 ref 讀最新的旗標而不是把它放進相依陣列 ——
+  // 否則每次重建開始與結束都要重掛一次監聽器。
+  const rebuildingRef = useRef(false);
+  rebuildingRef.current = rebuilding;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setPaletteOpen(true);
+        // 搜尋會查資料庫，重建期間開了只會拿到錯誤。
+        if (!rebuildingRef.current) setPaletteOpen(true);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -72,25 +95,42 @@ export default function App() {
     );
   }
 
-  if (!toc || !address) return <div className="loading">載入規則書⋯</div>;
+  if (!toc || !address || !editing) {
+    return <div className="loading">載入規則書⋯</div>;
+  }
+
+  // 重建會改變條目數，目錄要跟著更新。
+  const applied = () => {
+    getBuildInfo().then(setInfo).catch(() => {});
+    getToc().then(setToc).catch(() => {});
+    setDataVersion((v) => v + 1);
+  };
 
   const chapter = toc.chapters.find((c) => c.key === address.chapter);
   const tab = chapter?.tabs.find((t) => t.key === address.tab);
 
   return (
+    <EditingProvider
+      value={{ status: editing, onApplied: applied, rebuilding, setRebuilding }}
+    >
     <div className="app">
       <header className="chapter-bar">
         {toc.chapters.map((c) => (
           <button
             key={c.key}
             className={c.key === address.chapter ? "chapter-tab on" : "chapter-tab"}
+            disabled={rebuilding}
             onClick={() => gotoChapter(c.key)}
           >
             {c.title}
           </button>
         ))}
         <div className="bar-tail">
-          <button className="search-button" onClick={() => setPaletteOpen(true)}>
+          <button
+            className="search-button"
+            disabled={rebuilding}
+            onClick={() => setPaletteOpen(true)}
+          >
             搜尋 <kbd>Ctrl</kbd>
             <kbd>K</kbd>
           </button>
@@ -103,6 +143,7 @@ export default function App() {
           <button
             key={t.key}
             className={t.key === address.tab ? "tab on" : "tab"}
+            disabled={rebuilding}
             onClick={() => goto({ chapter: address.chapter, tab: t.key })}
           >
             {t.title}
@@ -111,7 +152,15 @@ export default function App() {
         ))}
       </nav>
 
-      <main className="page">{tab && renderChapter(tab, address, navigate)}</main>
+      <main className="page">
+        {tab && renderChapter(tab, address, navigate, dataVersion)}
+      </main>
+
+      {rebuilding && (
+        <div className="rebuild-banner">
+          正在重建資料庫⋯ 這段期間查詢會暫停，約一兩秒。
+        </div>
+      )}
 
       <footer className="statusbar">
         {info && (
@@ -128,6 +177,7 @@ export default function App() {
         onPick={navigate}
       />
     </div>
+    </EditingProvider>
   );
 }
 
@@ -141,12 +191,15 @@ function renderChapter(
   tab: { key: string; kind: string },
   address: Address,
   navigate: (a: Address) => void,
+  /** 資料重建的版本號。併進 key 就能在重建後強迫章節重新抓資料。 */
+  version: number,
 ) {
+  const key = `${tab.key}:${version}`;
   switch (tab.kind) {
     case "class":
       return (
         <ClassChapter
-          key={tab.key}
+          key={key}
           className={tab.key}
           onNavigate={navigate}
           pending={address.anchor}
@@ -155,29 +208,31 @@ function renderChapter(
     case "feats":
       return (
         <FeatChapter
-          key={tab.key}
+          key={key}
           group={tab.key}
           onNavigate={navigate}
           pending={address.anchor}
         />
       );
     case "race":
-      return <RaceChapter key={tab.key} pending={address.anchor} />;
+      return <RaceChapter key={key} pending={address.anchor} />;
     case "affix":
     case "material":
     case "ref_sheet":
     case "affix_distribution":
       return (
         <ItemChapter
-          key={tab.key}
+          key={key}
           kind={tab.kind}
           tabKey={tab.key}
           pending={address.anchor}
         />
       );
     case "prose":
-      return <ProseChapter key={tab.key} sheet={tab.key} pending={address.anchor} />;
+      return <ProseChapter key={key} sheet={tab.key} pending={address.anchor} />;
+    case "history":
+      return <HistoryChapter key={key} />;
     default:
-      return <AppendixChapter key={tab.key} kind={tab.kind} />;
+      return <AppendixChapter key={key} kind={tab.kind} />;
   }
 }

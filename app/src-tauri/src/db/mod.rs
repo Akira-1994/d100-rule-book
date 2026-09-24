@@ -34,8 +34,67 @@ pub use race::{RaceChapter, race_chapter};
 pub use refs::{RefTable, RefTableSummary, ref_index};
 pub use toc::{Toc, toc};
 
-/// 開啟後常駐的連線。SQLite 的 Connection 不是 Sync，所以包一層 Mutex。
-pub struct Db(pub Mutex<Connection>);
+/// 開啟後常駐的連線。
+///
+/// SQLite 的 Connection 不是 Sync，所以包一層 Mutex。裡面是 Option 而不是
+/// 直接放 Connection，因為重建資料庫時必須先放開檔案 —— Windows 上
+/// `build_db.py` 寫不進一個還被開著的檔案。重建期間這裡會是 None，
+/// 查詢在那段時間會拿到「正在重建」的錯誤。
+pub struct Db {
+    conn: Mutex<Option<Connection>>,
+    /// 目前這條連線開的是哪個檔案。重建之後要用同一個路徑重開。
+    pub(crate) path: PathBuf,
+}
+
+impl Db {
+    pub fn new(path: PathBuf, conn: Connection) -> Self {
+        Self {
+            conn: Mutex::new(Some(conn)),
+            path,
+        }
+    }
+
+    /// 借出連線執行查詢。
+    ///
+    /// Mutex 中毒（別的執行緒在持鎖時 panic）時回報錯誤字串，讓前端顯示
+    /// 訊息而不是整個 app 一起 panic。
+    pub fn with<T>(
+        &self,
+        f: impl FnOnce(&Connection) -> Result<T, String>,
+    ) -> Result<T, String> {
+        let guard = self
+            .conn
+            .lock()
+            .map_err(|_| "資料庫連線狀態異常，請重新開啟應用。".to_string())?;
+        match guard.as_ref() {
+            Some(conn) => f(conn),
+            None => Err("資料庫正在重建，請稍候再試。".to_string()),
+        }
+    }
+
+    /// 放開連線與檔案。重建前必須先做這件事 —— 丟棄 Connection 就會關閉
+    /// 檔案控制代碼，Windows 上 `build_db.py` 才寫得進去。
+    pub fn close(&self) -> Result<(), String> {
+        let mut guard = self
+            .conn
+            .lock()
+            .map_err(|_| "資料庫連線狀態異常，請重新開啟應用。".to_string())?;
+        *guard = None;
+        Ok(())
+    }
+
+    /// 重新開啟。重建無論成功或失敗都要呼叫 —— 一次失敗不該讓應用
+    /// 再也查不了東西。
+    pub fn reopen(&self) -> Result<(), String> {
+        let conn = open(&self.path)?;
+        let mut guard = self
+            .conn
+            .lock()
+            .map_err(|_| "資料庫連線狀態異常，請重新開啟應用。".to_string())?;
+        *guard = Some(conn);
+        Ok(())
+    }
+}
 
 /// 開發模式的資料庫位置：從 src-tauri 往上兩層就是 repo 根目錄。
 pub fn dev_path() -> PathBuf {
@@ -48,37 +107,52 @@ pub fn dev_path() -> PathBuf {
 
 /// 找出資料庫檔案。
 ///
-/// 開發時讀 repo 的 `dist/d100.db`，發佈版讀打包進去的 resource。
+/// **開發時優先讀 repo 的 `dist/d100.db`，發佈版優先讀打包進去的 resource。**
+///
+/// 順序很重要，而且曾經是反過來的：`npm run sync-db` 會把 dist 複製一份到
+/// `src-tauri/resources/`，那個複本在 `tauri dev` 底下也解析得到。resource
+/// 排在前面時，應用讀的是那份複本而不是 `build_db.py` 剛寫好的 dist ——
+/// 重跑建置後畫面不會變，而且完全沒有錯誤訊息，因為兩個檔案都是好的。
+///
 /// 兩種情況都找不到時回報所有找過的位置，比單純說「檔案不存在」好除錯。
 pub fn locate(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     use tauri::Manager;
 
-    let mut tried: Vec<PathBuf> = Vec::new();
+    let resource = app
+        .path()
+        .resolve("resources/d100.db", tauri::path::BaseDirectory::Resource)
+        .ok();
 
-    if let Ok(resource) = app.path().resolve(
-        "resources/d100.db",
-        tauri::path::BaseDirectory::Resource,
-    ) {
-        if resource.is_file() {
-            return Ok(resource);
+    let tried = candidates(resource, dev_path());
+    for path in &tried {
+        if path.is_file() {
+            return Ok(path.clone());
         }
-        tried.push(resource);
     }
-
-    let dev = dev_path();
-    if dev.is_file() {
-        return Ok(dev);
-    }
-    tried.push(dev);
 
     Err(format!(
-        "找不到規則書資料庫。已尋找：{}\n請先執行 python tools/build_db.py",
+        "找不到規則書資料庫。已尋找：{}
+請先執行 python tools/build_db.py",
         tried
             .iter()
             .map(|p| p.display().to_string())
             .collect::<Vec<_>>()
             .join("、")
     ))
+}
+
+/// 依序要試的位置。抽成純函式是為了讓順序本身有測試 —— 這裡弄反過的代價
+/// 是「改了資料卻看不到變化」，而那不會有任何錯誤訊息。
+fn candidates(resource: Option<PathBuf>, dev: PathBuf) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    if cfg!(debug_assertions) {
+        out.push(dev);
+        out.extend(resource);
+    } else {
+        out.extend(resource);
+        out.push(dev);
+    }
+    out
 }
 
 pub fn open(path: &PathBuf) -> Result<Connection, String> {
@@ -184,6 +258,28 @@ pub(crate) fn test_conn() -> Connection {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 開發時必須先看 dist —— 那是 build_db.py 寫的檔案。resource 是
+    /// sync-db 留下的複本，排在前面會讓重建後的改動看不見。
+    #[test]
+    fn 開發模式優先讀dist() {
+        let resource = PathBuf::from("resources/d100.db");
+        let dev = PathBuf::from("dist/d100.db");
+        let order = candidates(Some(resource.clone()), dev.clone());
+
+        assert_eq!(order.len(), 2);
+        if cfg!(debug_assertions) {
+            assert_eq!(order[0], dev, "開發模式要先看 dist");
+        } else {
+            assert_eq!(order[0], resource, "發佈版要先看打包進去的 resource");
+        }
+    }
+
+    #[test]
+    fn 沒有resource時仍然找得到dist() {
+        let dev = PathBuf::from("dist/d100.db");
+        assert_eq!(candidates(None, dev.clone()), vec![dev]);
+    }
 
     #[test]
     fn 建置資訊有內容() {
