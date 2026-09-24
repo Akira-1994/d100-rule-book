@@ -164,6 +164,8 @@ export interface MaterialAffix {
   roll_min: number;
   roll_max: number;
   effect: string;
+  /** 編輯時要用來定位勘誤。與母素材同一張工作表。 */
+  source_sheet: string;
   source_row: number;
 }
 

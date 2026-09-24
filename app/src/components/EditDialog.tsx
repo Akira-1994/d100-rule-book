@@ -26,6 +26,7 @@ export default function EditDialog({
   current,
   onClose,
   onApplied,
+  onRebuilding,
 }: {
   entryKind: string;
   entryName: string;
@@ -36,6 +37,8 @@ export default function EditDialog({
   current: Record<string, unknown>;
   onClose: () => void;
   onApplied: () => void;
+  /** 回報重建進行中，讓外殼擋住其他會觸發查詢的入口 */
+  onRebuilding: (value: boolean) => void;
 }) {
   const [fields, setFields] = useState<EditableField[] | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -62,6 +65,7 @@ export default function EditDialog({
   const submit = async () => {
     if (!fields) return;
     setBusy(true);
+    onRebuilding(true);
     setError(null);
     setResult(null);
     try {
@@ -77,6 +81,7 @@ export default function EditDialog({
       setError(String(e));
     } finally {
       setBusy(false);
+      onRebuilding(false);
     }
   };
 

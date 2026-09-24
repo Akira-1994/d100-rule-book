@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   BuildInfo,
@@ -36,6 +36,9 @@ export default function App() {
   // 重建之後用來強迫章節元件重新抓資料。位址不變，所以捲動位置與所在頁籤
   // 都保持原樣 —— 改完一條專長跳回第一章會很煩。
   const [dataVersion, setDataVersion] = useState(0);
+  // 重建期間資料庫連線是關著的，任何查詢都會失敗。與其讓人看到一片紅字，
+  // 不如先把會觸發查詢的入口擋住並說明正在做什麼。
+  const [rebuilding, setRebuilding] = useState(false);
 
   const { address, goto, gotoChapter } = useNavigation(toc);
 
@@ -49,11 +52,17 @@ export default function App() {
       .catch((e) => setStartupError(String(e)));
   }, []);
 
+  // 快速鍵的監聽只掛一次，用 ref 讀最新的旗標而不是把它放進相依陣列 ——
+  // 否則每次重建開始與結束都要重掛一次監聽器。
+  const rebuildingRef = useRef(false);
+  rebuildingRef.current = rebuilding;
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setPaletteOpen(true);
+        // 搜尋會查資料庫，重建期間開了只會拿到錯誤。
+        if (!rebuildingRef.current) setPaletteOpen(true);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -101,20 +110,27 @@ export default function App() {
   const tab = chapter?.tabs.find((t) => t.key === address.tab);
 
   return (
-    <EditingProvider value={{ status: editing, onApplied: applied }}>
+    <EditingProvider
+      value={{ status: editing, onApplied: applied, rebuilding, setRebuilding }}
+    >
     <div className="app">
       <header className="chapter-bar">
         {toc.chapters.map((c) => (
           <button
             key={c.key}
             className={c.key === address.chapter ? "chapter-tab on" : "chapter-tab"}
+            disabled={rebuilding}
             onClick={() => gotoChapter(c.key)}
           >
             {c.title}
           </button>
         ))}
         <div className="bar-tail">
-          <button className="search-button" onClick={() => setPaletteOpen(true)}>
+          <button
+            className="search-button"
+            disabled={rebuilding}
+            onClick={() => setPaletteOpen(true)}
+          >
             搜尋 <kbd>Ctrl</kbd>
             <kbd>K</kbd>
           </button>
@@ -127,6 +143,7 @@ export default function App() {
           <button
             key={t.key}
             className={t.key === address.tab ? "tab on" : "tab"}
+            disabled={rebuilding}
             onClick={() => goto({ chapter: address.chapter, tab: t.key })}
           >
             {t.title}
@@ -138,6 +155,12 @@ export default function App() {
       <main className="page">
         {tab && renderChapter(tab, address, navigate, dataVersion)}
       </main>
+
+      {rebuilding && (
+        <div className="rebuild-banner">
+          正在重建資料庫⋯ 這段期間查詢會暫停，約一兩秒。
+        </div>
+      )}
 
       <footer className="statusbar">
         {info && (

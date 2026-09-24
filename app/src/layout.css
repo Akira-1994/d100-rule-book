@@ -775,6 +775,21 @@ kbd {
   margin: 0 16px;
 }
 
+.rebuild-banner {
+  padding: 7px 18px;
+  font-size: 12px;
+  color: var(--gold);
+  background: var(--gold-soft);
+  border-top: 1px solid var(--gold-line);
+}
+
+.chapter-tab:disabled,
+.tab:disabled,
+.search-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* 修改紀錄 ----------------------------------------------------------- */
 
 .history-command,
