@@ -93,6 +93,14 @@ pub fn cost_for_level(level: i64, difficulty: f64) -> f64 {
     (2f64).powi(level as i32) * difficulty
 }
 
+/// 從 1 級學到 `level` 級的累計花費。
+///
+/// 等級 0 不計入 —— 它是獨立選項而非升級的第一階（原文的範例
+/// 「武器使用學到等級 3 為 (2＋4＋8)×1 = 14 點」就沒有把它算進去）。
+pub fn cumulative_cost(level: i64, difficulty: f64) -> f64 {
+    (1..=level).map(|l| cost_for_level(l, difficulty)).sum()
+}
+
 /// 等級 0 到 `MAX_LEVEL` 的成本表。
 ///
 /// 等級 0 是獨立選項（只為免除該技能判定的 20% 減值），計價方式與其他等級
@@ -485,6 +493,22 @@ mod tests {
     }
 
     /// 難度不是整數的條目（例如 0.5）也要算得出來，不能假設是整數。
+    #[test]
+    fn 累計花費與成本表一致() {
+        // 兩條路徑算同一件事，分歧就是 bug。
+        for difficulty in [0.5, 1.0, 3.0, 6.0] {
+            let plan = cp_plan(difficulty, "cp");
+            for level in 1..=MAX_LEVEL {
+                assert_eq!(
+                    cumulative_cost(level, difficulty),
+                    plan.steps[level as usize].cumulative,
+                    "難度 {difficulty} 的等級 {level}"
+                );
+            }
+        }
+        assert_eq!(cumulative_cost(0, 1.0), 0.0, "等級 0 不計入累計");
+    }
+
     #[test]
     fn 非整數難度不被截斷() {
         let plan = cp_plan(0.5, "cp");

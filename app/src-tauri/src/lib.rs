@@ -1,6 +1,7 @@
 mod db;
 mod editing;
 mod rules;
+mod sheet;
 
 use db::{
     AffixChapter, BuildInfo, ClassChapter, Db, DistributionGroup, EntryDetail, ErrataEntry,
@@ -11,7 +12,15 @@ use editing::history::ErrataHistory;
 use editing::rebuild::RebuildResult;
 use editing::{EditRequest, EditableField, EditingStatus};
 use rules::CpPlan;
+use sheet::store::SheetSummary;
+use sheet::{Derived, Sheet};
 use tauri::Manager;
+
+/// 角色卡存放的位置。
+///
+/// 這是本專案第一個寫進使用者資料夾的東西 —— 規則書資料庫是建置產物、
+/// 勘誤在 repo 裡，角色卡兩者都不是：它屬於玩家。
+pub struct SheetDir(pub std::path::PathBuf);
 
 /// 一次借出連線並執行查詢。連線的生命週期管理在 `Db` 裡。
 fn with_conn<T>(
@@ -153,6 +162,64 @@ fn errata_history() -> ErrataHistory {
     editing::history::history()
 }
 
+// 角色卡 ----------------------------------------------------------------
+
+#[tauri::command]
+fn list_sheets(dir: tauri::State<'_, SheetDir>) -> Result<Vec<SheetSummary>, String> {
+    sheet::store::list(&dir.0)
+}
+
+#[tauri::command]
+fn load_sheet(dir: tauri::State<'_, SheetDir>, id: String) -> Result<Sheet, String> {
+    sheet::store::load(&dir.0, &id)
+}
+
+#[tauri::command]
+fn save_sheet(dir: tauri::State<'_, SheetDir>, sheet: Sheet) -> Result<(), String> {
+    sheet::store::save(&dir.0, &sheet)
+}
+
+#[tauri::command]
+fn new_sheet(dir: tauri::State<'_, SheetDir>, name: String) -> Result<Sheet, String> {
+    let sheet = Sheet::new(sheet::new_id(), name);
+    sheet::store::save(&dir.0, &sheet)?;
+    Ok(sheet)
+}
+
+/// 刪除是真的刪檔案，沒得復原。呼叫端負責先跟使用者確認。
+#[tauri::command]
+fn delete_sheet(dir: tauri::State<'_, SheetDir>, id: String) -> Result<(), String> {
+    sheet::store::delete(&dir.0, &id)
+}
+
+#[tauri::command]
+fn import_sheet(
+    dir: tauri::State<'_, SheetDir>,
+    path: String,
+) -> Result<Sheet, String> {
+    sheet::store::import(&dir.0, std::path::Path::new(&path), sheet::new_id())
+}
+
+#[tauri::command]
+fn export_sheet(
+    dir: tauri::State<'_, SheetDir>,
+    id: String,
+    path: String,
+) -> Result<(), String> {
+    sheet::store::export(&dir.0, &id, std::path::Path::new(&path))
+}
+
+/// 算出一張卡的所有衍生值。
+///
+/// 表單每改一個字就呼叫一次，所以只查資料庫、不碰檔案。
+#[tauri::command]
+fn derive_sheet(state: tauri::State<'_, Db>, sheet: Sheet) -> Result<Derived, String> {
+    with_conn(&state, |conn| {
+        let context = sheet::context::load(conn, &sheet)?;
+        Ok(sheet::derive(&sheet, &context))
+    })
+}
+
 #[tauri::command]
 fn search(state: tauri::State<'_, Db>, query: String) -> Result<Vec<SearchHit>, String> {
     with_conn(&state, |conn| db::search(conn, &query, 60))
@@ -177,6 +244,14 @@ pub fn run() {
             let path = db::locate(app.handle())?;
             let conn = db::open(&path)?;
             app.manage(Db::new(path, conn));
+
+            // 角色卡放使用者資料夾。這是第一個會寫進去的東西，資料夾
+            // 不存在時由 store 在第一次存檔時建出來。
+            let data_dir = app
+                .path()
+                .app_data_dir()
+                .map_err(|e| format!("取不到使用者資料夾：{e}"))?;
+            app.manage(SheetDir(data_dir));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -198,6 +273,14 @@ pub fn run() {
             editable_fields,
             append_errata,
             errata_history,
+            list_sheets,
+            load_sheet,
+            save_sheet,
+            new_sheet,
+            delete_sheet,
+            import_sheet,
+            export_sheet,
+            derive_sheet,
             search,
             entry_detail
         ])
