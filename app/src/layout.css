@@ -818,6 +818,321 @@ kbd {
   overflow-y: auto;
 }
 
+/* 角色卡 ------------------------------------------------------------- */
+
+.sheet-layout {
+  grid-template-columns: 200px 1fr;
+}
+
+.sheet-list {
+  border-right: 1px solid var(--line2);
+  padding: 16px 12px 16px 0;
+  overflow-y: auto;
+}
+
+.sheet-list-head {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.sheet-list-head button {
+  flex: 1;
+  font-size: 12px;
+  padding: 5px 0;
+}
+
+.sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+
+.sheet-row.on {
+  background: var(--gold-soft);
+}
+
+.sheet-open {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  font-size: 13px;
+  padding: 5px 6px;
+  border: 0;
+  background: none;
+  color: var(--text2);
+  text-align: left;
+}
+
+.sheet-row.on .sheet-open {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.sheet-broken {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--accent);
+}
+
+.sheet-remove {
+  font-size: 10.5px;
+  padding: 3px 7px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--text3);
+}
+
+.sheet-remove:hover {
+  color: var(--accent);
+  border-color: var(--accent-soft);
+}
+
+.sheet-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.sheet-head .path-name {
+  margin: 0;
+}
+
+.sheet-saved {
+  font-size: 11px;
+  color: var(--text3);
+  margin-left: auto;
+}
+
+/* 表單在左、衍生值在右。衍生值是看的，表單是改的，分兩欄才不必一直捲。 */
+.sheet-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1200px) {
+  .sheet-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sheet-block {
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.sheet-note {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--text3);
+  line-height: 1.7;
+}
+
+.sheet-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.sheet-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sheet-form input,
+.sheet-form select,
+.sheet-form textarea {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  width: 100%;
+}
+
+.sheet-attrs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 8px;
+}
+
+.sheet-attr {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "label mod" "input input";
+  gap: 3px 6px;
+  align-items: baseline;
+}
+
+.sheet-attr > span {
+  grid-area: label;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.sheet-attr > span i {
+  font-style: normal;
+  font-family: var(--sans);
+  font-weight: 400;
+  color: var(--text3);
+  margin-left: 4px;
+}
+
+.sheet-attr > em {
+  grid-area: mod;
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text2);
+}
+
+.sheet-attr > input {
+  grid-area: input;
+}
+
+.sheet-search {
+  margin-bottom: 8px;
+}
+
+.sheet-feats,
+.sheet-values,
+.sheet-pool {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.sheet-feats th,
+.sheet-pool th {
+  text-align: left;
+  font-size: 10.5px;
+  color: var(--gold);
+  padding: 4px 6px 4px 0;
+}
+
+.sheet-feats td,
+.sheet-pool td,
+.sheet-values td,
+.sheet-values th {
+  padding: 3px 6px 3px 0;
+  border-bottom: 1px solid var(--line2);
+}
+
+.sheet-feats input,
+.sheet-feats select {
+  width: auto;
+  min-width: 70px;
+  padding: 3px 6px;
+}
+
+.sheet-values th {
+  text-align: left;
+  font-weight: 400;
+  color: var(--text2);
+  white-space: nowrap;
+}
+
+.sheet-formula,
+.sheet-total {
+  font-family: var(--mono);
+  text-align: right;
+  width: 46px;
+}
+
+.sheet-total {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.sheet-plus {
+  color: var(--text3);
+  width: 16px;
+  text-align: center;
+}
+
+.sheet-delta {
+  width: 54px;
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 12px;
+  text-align: right;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 2px 5px;
+}
+
+.sheet-adj-note {
+  width: 100%;
+  font: inherit;
+  font-size: 11px;
+  color: var(--text2);
+  background: none;
+  border: 0;
+  border-bottom: 1px dotted var(--line);
+  padding: 2px 0;
+}
+
+.sheet-ledger {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.sheet-ledger dt {
+  color: var(--text2);
+}
+
+.sheet-ledger dd {
+  margin: 0;
+  font-family: var(--mono);
+  text-align: right;
+}
+
+.sheet-ledger dd.strong {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.sheet-ledger dd.danger {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.sheet-warnings {
+  margin-bottom: 18px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--gold-soft);
+  border-left: 3px solid var(--gold);
+}
+
+.sheet-warnings ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--text2);
+}
+
 /* 右側小目錄 --------------------------------------------------------- */
 
 .section-nav {

@@ -238,6 +238,7 @@ fn entry_detail(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // 資料庫找不到時就讓啟動失敗並印出找過哪些路徑 —— 這比開起一個
             // 每次查詢都報錯的空視窗容易診斷得多。
